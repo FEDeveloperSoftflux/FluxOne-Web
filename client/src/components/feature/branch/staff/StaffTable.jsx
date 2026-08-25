@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { NativeSelect } from '@/components/ui/select'
 import { staffInitials } from '@/lib/mapBranchDashboard'
+import { BRAND } from '@/lib/constants'
 
 function formatJoined(value) {
   if (!value) return '—'
