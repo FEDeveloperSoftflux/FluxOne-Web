@@ -1,0 +1,109 @@
+export const endpoints = {
+  auth: {
+    login: '/auth/login',
+    refresh: '/auth/refresh',
+    me: '/auth/me',
+    update: '/auth/me',
+    logout: '/auth/logout',
+  },
+  dashboard: {
+    overview: '/inventory/dashboard/overview',
+    alerts: '/inventory/dashboard/alerts',
+    stockGraph: '/inventory/dashboard/stock-graph',
+    /** @deprecated use overview / alerts / stockGraph */
+    summary: '/inventory/dashboard/overview',
+  },
+  branch: {
+    dashboard: '/branch/dashboard',
+    staff: {
+      list: '/branch/staff',
+      create: '/branch/staff',
+      detail: (id) => `/branch/staff/${id}`,
+      update: (id) => `/branch/staff/${id}`,
+      status: (id) => `/branch/staff/${id}/status`,
+      delete: (id) => `/branch/staff/${id}`,
+    },
+    designations: {
+      list: '/branch/designations',
+    },
+  },
+  products: {
+    list: '/inventory/products',
+    create: '/inventory/products',
+    bundles: '/inventory/products/bundles',
+    import: '/inventory/products/import',
+    scan: '/inventory/products/scan',
+    detail: (id) => `/inventory/products/${id}`,
+    update: (id) => `/inventory/products/${id}`,
+    remove: (id) => `/inventory/products/${id}`,
+    barcode: (id) => `/inventory/products/${id}/barcode`,
+    categories: '/inventory/products/categories',
+    subcategories: '/inventory/products/subcategories',
+    category: (id) => `/inventory/products/categories/${id}`,
+    taxes: '/inventory/products/taxes',
+    offers: '/inventory/products/offers',
+  },
+  /** @deprecated prefer products.* — kept for older slices */
+  categories: {
+    list: '/inventory/products/categories',
+    create: '/inventory/products/categories',
+    update: (id) => `/inventory/products/categories/${id}`,
+  },
+  items: {
+    list: '/inventory/products',
+    create: '/inventory/products',
+    update: (id) => `/inventory/products/${id}`,
+    import: '/inventory/products/import',
+  },
+  control: {
+    stockIn: '/inventory/control/stock-in',
+    stockInFromOrder: '/inventory/control/stock-in/from-order',
+    stockOut: '/inventory/control/stock-out',
+    adjustments: '/inventory/control/adjustments',
+    adjustment: (id) => `/inventory/control/adjustments/${id}`,
+    damaged: '/inventory/control/damaged',
+    damagedItem: (id) => `/inventory/control/damaged/${id}`,
+    expired: '/inventory/control/expired',
+    expiredItem: (id) => `/inventory/control/expired/${id}`,
+    transfers: '/inventory/control/transfers',
+  },
+  lookups: {
+    employees: '/inventory/lookups/employees',
+    branches: '/inventory/lookups/branches',
+  },
+  stockIn: {
+    list: '/inventory/control/stock-in',
+    create: '/inventory/control/stock-in',
+  },
+  stockOut: {
+    list: '/inventory/control/stock-out',
+  },
+  adjustments: {
+    list: '/inventory/control/adjustments',
+    create: '/inventory/control/adjustments',
+  },
+  damaged: {
+    list: '/inventory/control/damaged',
+    create: '/inventory/control/damaged',
+  },
+  expired: {
+    list: '/inventory/control/expired',
+  },
+    suppliers: {
+    list: '/inventory/suppliers',
+    create: '/inventory/suppliers',
+    update: (id) => `/inventory/suppliers/${id}`,
+    status: (id) => `/inventory/suppliers/${id}/status`,
+    remove: (id) => `/inventory/suppliers/${id}`,
+  },
+  orders: {
+    list: '/inventory/purchase-orders',
+    create: '/inventory/purchase-orders',
+    detail: (id) => `/inventory/purchase-orders/${id}`,
+    history: (id) => `/inventory/purchase-orders/${id}/history`,
+    print: (id) => `/inventory/purchase-orders/${id}/print`,
+    approve: (id) => `/inventory/purchase-orders/${id}/approve`,
+    sendSms: (id) => `/inventory/purchase-orders/${id}/send-sms`,
+    cancel: (id) => `/inventory/purchase-orders/${id}/cancel`,
+  },
+}

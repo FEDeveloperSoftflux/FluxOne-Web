@@ -1,0 +1,23 @@
+import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { LoginForm } from '@/components/feature/auth/LoginForm'
+import { AuthLayout } from '@/layouts/AuthLayout'
+import { useAuthSession } from '@/hooks/useAuthSession'
+import { homePathForRole } from '@/router/paths'
+
+export function LoginPage() {
+  const navigate = useNavigate()
+  const { isAuthenticated, role } = useAuthSession()
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate(homePathForRole(role), { replace: true })
+    }
+  }, [isAuthenticated, role, navigate])
+
+  return (
+    <AuthLayout>
+      <LoginForm />
+    </AuthLayout>
+  )
+}

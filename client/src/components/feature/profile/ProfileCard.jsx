@@ -1,0 +1,74 @@
+import { Pencil } from 'lucide-react'
+import { BRAND } from '@/lib/constants'
+import { getInitials, roleDisplayName } from '@/lib/nav'
+import { cn } from '@/lib/utils'
+
+function DetailRow({ label, value }) {
+  return (
+    <div className="flex flex-col gap-1 rounded-xl bg-slate-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-4">
+      <span className="shrink-0 text-sm text-slate-500">{label}</span>
+      <span className="break-all text-sm font-semibold text-slate-900 sm:truncate sm:text-right">
+        {value || '—'}
+      </span>
+    </div>
+  )
+}
+
+/**
+ * Reusable profile card for BM / IM (and any signed-in role).
+ * No email row — User ID is the login id.
+ */
+export function ProfileCard({
+  name,
+  loginId,
+  role,
+  loginExpires,
+  onEdit,
+  className,
+}) {
+  const displayName = name || 'User'
+  const roleLabel = roleDisplayName(role)
+  const initials = getInitials(displayName, loginId)
+
+  return (
+    <section
+      className={cn(
+        'relative w-full max-w-md rounded-2xl border border-border bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] sm:p-8',
+        className,
+      )}
+    >
+      {onEdit ? (
+        <button
+          type="button"
+          aria-label="Edit profile"
+          onClick={onEdit}
+          className="absolute top-3 right-3 flex size-9 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-50 hover:text-[#8E238F] sm:top-4 sm:right-4"
+        >
+          <Pencil className="size-4" strokeWidth={1.75} />
+        </button>
+      ) : null}
+
+      <div className="flex items-center gap-3 pr-10 sm:gap-4">
+        <div
+          className="flex size-14 shrink-0 items-center justify-center rounded-full text-base font-bold text-white sm:size-[4.5rem] sm:text-xl"
+          style={{ background: BRAND.purple }}
+        >
+          {initials}
+        </div>
+        <div className="min-w-0">
+          <h2 className="truncate text-lg font-bold tracking-tight text-slate-900 sm:text-2xl">
+            {displayName}
+          </h2>
+          <p className="mt-0.5 text-sm text-slate-500">{roleLabel}</p>
+        </div>
+      </div>
+
+      <div className="mt-5 space-y-2.5 sm:mt-8">
+        <DetailRow label="Name" value={displayName} />
+        <DetailRow label="User ID" value={loginId} />
+        <DetailRow label="Role" value={roleLabel} />
+        <DetailRow label="Login expires" value={loginExpires} />
+      </div>
+    </section>
+  )
+}

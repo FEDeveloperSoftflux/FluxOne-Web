@@ -1,0 +1,103 @@
+import { query } from '../../config/db.js'
+
+/**
+ * Resolve login by User ID (email) only — tenant comes from the matched user row.
+ * Returns all active matches (normally 0 or 1; >1 if same email exists in multiple tenants).
+ */
+export async function findAuthUsersByLoginId(loginId) {
+  const { rows } = await query(
+    `
+      SELECT
+        u.id,
+        u.tenant_id AS "tenantId",
+        u.branch_id AS "branchId",
+        u.full_name AS "fullName",
+        u.email,
+        u.password_hash AS "passwordHash",
+        u.is_active AS "isActive",
+        r.slug AS role,
+        t.slug AS "tenantSlug",
+        t.name AS "tenantName"
+      FROM users u
+      JOIN roles r ON r.id = u.role_id
+      JOIN tenants t ON t.id = u.tenant_id
+      WHERE lower(u.email) = lower($1)
+        AND u.is_active = true
+      ORDER BY u.created_at ASC
+    `,
+    [loginId],
+  )
+  return rows
+}
+
+export async function findAuthUserById(id, tenantId) {
+  const { rows } = await query(
+    `
+      SELECT
+        u.id,
+        u.tenant_id AS "tenantId",
+        u.branch_id AS "branchId",
+        u.full_name AS "fullName",
+        u.email,
+        u.password_hash AS "passwordHash",
+        u.is_active AS "isActive",
+        r.slug AS role,
+        t.slug AS "tenantSlug",
+        t.name AS "tenantName"
+      FROM users u
+      JOIN roles r ON r.id = u.role_id
+      JOIN tenants t ON t.id = u.tenant_id
+      WHERE u.id = $1
+        AND u.tenant_id = $2
+      LIMIT 1
+    `,
+    [id, tenantId],
+  )
+  return rows[0] || null
+}
+
+export async function updatePasswordHash(userId, tenantId, passwordHash) {
+  await query(
+    `
+      UPDATE users
+      SET password_hash = $3
+      WHERE id = $1 AND tenant_id = $2
+    `,
+    [userId, tenantId, passwordHash],
+  )
+}
+
+/** Update display name and/or login ID (email column). */
+export async function updateAuthProfile(userId, tenantId, { fullName, email }) {
+  if (email) {
+    const { rows: clashes } = await query(
+      `
+        SELECT id
+        FROM users
+        WHERE tenant_id = $1
+          AND lower(email) = lower($2)
+          AND id <> $3
+        LIMIT 1
+      `,
+      [tenantId, email, userId],
+    )
+    if (clashes[0]) {
+      const error = new Error('This User ID is already in use')
+      error.status = 409
+      throw error
+    }
+  }
+
+  const { rows } = await query(
+    `
+      UPDATE users
+      SET
+        full_name = COALESCE($3, full_name),
+        email = COALESCE($4, email)
+      WHERE id = $1 AND tenant_id = $2
+      RETURNING id
+    `,
+    [userId, tenantId, fullName || null, email || null],
+  )
+  return rows[0] || null
+}

@@ -1,0 +1,161 @@
+export const PRODUCT_TYPES = {
+  SINGLE: 'single',
+  BUNDLE: 'bundle',
+}
+
+export const PRODUCT_STATUS = {
+  ACTIVE: 'active',
+  INACTIVE: 'inactive',
+  /** @deprecated */
+  OPEN: 'active',
+  /** @deprecated */
+  CLOSE: 'inactive',
+}
+
+export const SCALE_OPTIONS = ['unit', 'kg', 'g', 'liter', 'ml', 'pack', 'box', 'dozen']
+
+/**
+ * Zod rejects empty strings on optional UUID fields.
+ * Use undefined so JSON.stringify / apiClient omit them.
+ */
+export function asOptionalUuid(value) {
+  if (value == null || value === '') return undefined
+  return String(value)
+}
+
+/** Drop blanks so taxIds: [""] never hits the API. */
+export function cleanUuidList(ids) {
+  if (!Array.isArray(ids)) return []
+  return ids.map((id) => asOptionalUuid(id)).filter(Boolean)
+}
+
+export function mapProduct(row = {}) {
+  return {
+    id: row.id,
+    name: row.name || '',
+    itemCode: row.itemCode || row.item_code || '',
+    barcode: row.barcode || '',
+    type: row.type || PRODUCT_TYPES.SINGLE,
+    scale: row.scale || 'unit',
+    quantity: Number(row.quantity ?? 0),
+    status:
+      row.status === PRODUCT_STATUS.INACTIVE || row.status === 'close'
+        ? PRODUCT_STATUS.INACTIVE
+        : PRODUCT_STATUS.ACTIVE,
+    imageUrl: row.imageUrl || row.image_url || null,
+    description: row.description || '',
+    categoryId: row.categoryId ?? row.category_id ?? null,
+    subcategoryId: row.subcategoryId ?? row.subcategory_id ?? null,
+    purchasePrice: Number(row.purchasePrice ?? row.purchase_price ?? 0),
+    sellingPrice: Number(row.sellingPrice ?? row.selling_price ?? 0),
+    discountPercent: Number(row.discountPercent ?? row.discount_percent ?? 0),
+    offerId: row.offerId ?? row.offer_id ?? null,
+    offerName: row.offerName ?? row.offer_name ?? '',
+    offerPercent: Number(row.offerPercent ?? row.offer_percent ?? 0),
+    lastPurchasePrice: Number(row.lastPurchasePrice ?? row.last_purchase_price ?? 0),
+    lastSellingPrice: Number(row.lastSellingPrice ?? row.last_selling_price ?? 0),
+    lastPurchaseVendorName: row.lastPurchaseVendorName ?? row.last_purchase_vendor_name ?? '',
+    currentPurchaseVendorName:
+      row.currentPurchaseVendorName ?? row.current_purchase_vendor_name ?? '',
+    taxPercent: Number(row.taxPercent ?? row.tax_percent ?? 0),
+    taxNames: Array.isArray(row.taxNames) ? row.taxNames : row.tax_names || [],
+    taxIds: Array.isArray(row.taxIds) ? row.taxIds : row.tax_ids || [],
+    finalPrice: Number(row.finalPrice ?? row.final_price ?? row.sellingPrice ?? 0),
+    bundleItems: Array.isArray(row.bundleItems)
+      ? row.bundleItems
+      : Array.isArray(row.bundle_items)
+        ? row.bundle_items
+        : [],
+  }
+}
+
+export function mapCategory(row = {}) {
+  return {
+    id: row.id,
+    parentId: row.parentId ?? row.parent_id ?? null,
+    name: row.name || '',
+    imageUrl: row.imageUrl || row.image_url || null,
+    isActive: row.isActive ?? row.is_active ?? true,
+  }
+}
+
+export function splitCategories(rows = []) {
+  const list = rows.map(mapCategory)
+  const parents = list.filter((row) => !row.parentId)
+  const childrenByParent = new Map()
+  for (const row of list) {
+    if (!row.parentId) continue
+    const bucket = childrenByParent.get(row.parentId) || []
+    bucket.push(row)
+    childrenByParent.set(row.parentId, bucket)
+  }
+  return { parents, childrenByParent, all: list }
+}
+
+export function money(value) {
+  return Number(value || 0).toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })
+}
+
+/** Build JSON body or FormData when an image file is present. */
+export function buildProductPayload(fields, { withConfirmed = true } = {}) {
+  // Never send categoryId: "" — Zod uuid() → 422 Invalid uuid
+  const categoryId = asOptionalUuid(fields.categoryId)
+  const base = {
+    name: String(fields.name || '').trim(),
+    ...(categoryId ? { categoryId } : {}),
+    subcategoryId: asOptionalUuid(fields.subcategoryId),
+    type: fields.type || PRODUCT_TYPES.SINGLE,
+    scale: fields.scale || 'unit',
+    description: fields.description?.trim() || undefined,
+    purchasePrice: Number(fields.purchasePrice ?? 0),
+    sellingPrice: Number(fields.sellingPrice ?? 0),
+    taxIds: cleanUuidList(fields.taxIds),
+    offerId: asOptionalUuid(fields.offerId),
+    discountPercent:
+      fields.discountPercent === '' || fields.discountPercent == null
+        ? undefined
+        : Number(fields.discountPercent),
+    bundleItems: Array.isArray(fields.bundleItems)
+      ? fields.bundleItems
+          .map((row) => ({
+            itemId: asOptionalUuid(row.itemId),
+            quantity: Number(row.quantity),
+          }))
+          .filter((row) => row.itemId)
+      : undefined,
+  }
+  if (withConfirmed) base.confirmed = true
+
+  if (fields.image instanceof File && fields.image.size > 0) {
+    const form = new FormData()
+    Object.entries(base).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === '') return
+      if (Array.isArray(value)) {
+        // Multipart: send JSON string for arrays (server zod may fail — prefer JSON create then PATCH image)
+        form.append(key, JSON.stringify(value))
+      } else {
+        form.append(key, String(value))
+      }
+    })
+    form.append('image', fields.image)
+    return form
+  }
+
+  return base
+}
+
+/**
+ * Prefer JSON create/update (arrays validate). If image present, follow with image-only PATCH.
+ */
+export function splitProductWrite(fields, { withConfirmed = true } = {}) {
+  const image = fields.image instanceof File && fields.image.size > 0 ? fields.image : null
+  const json = buildProductPayload({ ...fields, image: null }, { withConfirmed })
+  return { json, image }
+}
+
+/** @deprecated use productCsv.js — kept for older imports */
+export { productsToCsv, downloadTextFile } from '@/lib/productCsv'
+
