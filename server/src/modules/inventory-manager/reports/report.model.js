@@ -58,7 +58,16 @@ export async function stockMovementReport(tenantId, { from, to } = {}) {
       SELECT
         l.movement_type AS "movementType",
         count(*)::int AS "eventCount",
-        COALESCE(sum(l.quantity), 0)::numeric AS "totalQuantity"
+        COALESCE(
+          sum(
+            CASE
+              WHEN l.movement_type IN ('out', 'damaged', 'expired') THEN -ABS(l.quantity)
+              WHEN l.movement_type = 'transfer' THEN ABS(l.quantity)
+              ELSE l.quantity
+            END
+          ),
+          0
+        )::numeric AS "totalQuantity"
       FROM inventory_ledger l
       WHERE l.tenant_id = $1
         AND ($2::date IS NULL OR l.created_at::date >= $2::date)

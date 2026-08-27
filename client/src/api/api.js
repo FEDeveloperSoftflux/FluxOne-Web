@@ -214,6 +214,12 @@ async function mockRequest(method, path, body) {
     return ok({ ...(body || {}), id: body?.id || crypto.randomUUID() })
   }
 
+  if (route.includes('/inventory/control') || route.includes('/inventory/')) {
+    return fail(
+      `Mock API does not cover inventory Control. Disable VITE_MOCK_API and use the live API for ${method} ${route}`,
+    )
+  }
+
   return fail(`No mock handler for ${method} ${route}`)
 }
 

@@ -5,6 +5,7 @@ import {
   insertLedgerLines,
   listLedger,
   listTransfers,
+  processDueExpirations,
   updateLedgerEvent,
 } from './control.model.js'
 import { receivePurchaseOrder } from '../purchase-orders/purchase_order.model.js'
@@ -19,11 +20,53 @@ function listByType(movementType) {
   }
 }
 
+function updateByType(movementType) {
+  return async (req, res) => {
+    const row = await updateLedgerEvent(
+      req.tenantId,
+      req.validated.params.id,
+      req.validated.body,
+      movementType,
+    )
+    if (!row) return fail(res, 'Record not found', 404)
+    return success(res, row)
+  }
+}
+
+function removeByType(movementType) {
+  return async (req, res) => {
+    const deleted = await deleteLedgerEvent(req.tenantId, req.validated.params.id, movementType)
+    if (!deleted) return fail(res, 'Record not found', 404)
+    return success(res, { deleted: true })
+  }
+}
+
 export const listStockIn = listByType(MOVEMENT_TYPES.IN)
-export const listStockOut = listByType(MOVEMENT_TYPES.OUT)
 export const listAdjustments = listByType(MOVEMENT_TYPES.ADJUSTMENT)
 export const listDamaged = listByType(MOVEMENT_TYPES.DAMAGED)
-export const listExpired = listByType(MOVEMENT_TYPES.EXPIRED)
+
+/** Stock-out history: sales + damaged + expired (no manual create). */
+export async function listStockOut(req, res) {
+  const result = await listLedger(req.tenantId, {
+    ...req.validated.query,
+    movementTypes: [MOVEMENT_TYPES.OUT, MOVEMENT_TYPES.DAMAGED, MOVEMENT_TYPES.EXPIRED],
+  })
+  return success(res, paginatedResult(result.items, result))
+}
+
+/** Process past-due stock-in lots, then list expired history. */
+export async function listExpired(req, res) {
+  try {
+    await processDueExpirations(req.tenantId, req.user?.id || null)
+  } catch (err) {
+    console.error('[listExpired] processDueExpirations', err.message)
+  }
+  const result = await listLedger(req.tenantId, {
+    ...req.validated.query,
+    movementType: MOVEMENT_TYPES.EXPIRED,
+  })
+  return success(res, paginatedResult(result.items, result))
+}
 
 export async function listStockTransfers(req, res) {
   const result = await listTransfers(req.tenantId, req.validated.query)
@@ -94,14 +137,10 @@ export async function createTransfer(req, res) {
   return success(res, row, 201)
 }
 
-export async function updateMovement(req, res) {
-  const row = await updateLedgerEvent(req.tenantId, req.validated.params.id, req.validated.body)
-  if (!row) return fail(res, 'Record not found', 404)
-  return success(res, row)
-}
+export const updateAdjustment = updateByType(MOVEMENT_TYPES.ADJUSTMENT)
+export const updateDamaged = updateByType(MOVEMENT_TYPES.DAMAGED)
+export const updateExpired = updateByType(MOVEMENT_TYPES.EXPIRED)
 
-export async function removeMovement(req, res) {
-  const deleted = await deleteLedgerEvent(req.tenantId, req.validated.params.id)
-  if (!deleted) return fail(res, 'Record not found', 404)
-  return success(res, { deleted: true })
-}
+export const removeAdjustment = removeByType(MOVEMENT_TYPES.ADJUSTMENT)
+export const removeDamaged = removeByType(MOVEMENT_TYPES.DAMAGED)
+export const removeExpired = removeByType(MOVEMENT_TYPES.EXPIRED)

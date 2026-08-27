@@ -20,6 +20,7 @@ export const stockInSchema = z.object({
           scale: z.string().min(1),
           quantity: z.coerce.number().positive(),
           unitCost: z.coerce.number().nonnegative().optional(),
+          expiresAt: z.coerce.date().optional(),
         }),
       )
       .min(1),
@@ -53,6 +54,7 @@ export const stockMovementSchema = z.object({
 export const adjustmentSchema = stockMovementSchema.extend({
   body: stockMovementSchema.shape.body.extend({
     reason: z.string().min(3),
+    quantity: z.coerce.number().refine((n) => n !== 0, 'Adjustment quantity cannot be zero'),
   }),
 })
 
@@ -101,7 +103,10 @@ export const ledgerIdParamsSchema = z.object({
 
 export const patchMovementSchema = z.object({
   body: z.object({
-    quantity: z.coerce.number().optional(),
+    quantity: z.coerce
+      .number()
+      .refine((n) => n !== 0, 'Quantity cannot be zero')
+      .optional(),
     reason: z.string().min(3).optional(),
     damagedByUserId: z.string().uuid().optional(),
     damagedLocation: z.enum(['traveling', 'warehouse', 'item_transfer', 'other']).optional(),

@@ -63,3 +63,35 @@
 body {
   @apply bg-background text-foreground antialiased;
 }
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton-block {
+  background-image: linear-gradient(
+    90deg,
+    rgb(241 245 249) 0%,
+    rgb(226 232 240) 45%,
+    rgb(241 245 249) 90%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-block {
+    animation: none;
+    background: rgb(241 245 249);
+  }
+}
+
+/* Interactive controls that are not Button (nav, icon toggles, cards) */
+.interactive {
+  @apply cursor-pointer transition-all duration-200 ease-out active:scale-[0.98];
+}

@@ -20,7 +20,7 @@ export const PATHS = {
   },
 }
 
-export const INVENTORY_ROLES = ['inventory_manager']
+export const INVENTORY_ROLES = ['inventory_manager', 'b2b_admin']
 export const BRANCH_ROLES = ['branch_manager']
 
 export function homePathForRole(role) {
@@ -29,7 +29,7 @@ export function homePathForRole(role) {
   return PATHS.profile
 }
 
-/** Profile lives inside BM / IM layouts so the top nav stays visible. */
+// Profile lives inside BM / IM layouts so the top nav stays visible.
 export function profilePathForRole(role) {
   if (INVENTORY_ROLES.includes(role)) return PATHS.inventory.profile
   if (BRANCH_ROLES.includes(role)) return PATHS.branch.profile

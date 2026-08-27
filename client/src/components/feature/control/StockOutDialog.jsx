@@ -16,9 +16,8 @@ import { BRAND } from '@/lib/constants'
 import { SCALE_OPTIONS } from '@/lib/mapProduct'
 import { fetchControlProductOptions } from '@/hooks/useInventoryControl'
 
-/**
- * Stock-out create dialog.
- */
+// Stock-out create dialog.
+
 export function StockOutDialog({
   open,
   onOpenChange,
@@ -50,15 +49,8 @@ export function StockOutDialog({
     setSubcategoryId('')
     setQuantity('1')
     setReason('')
-    void fetchControlProductOptions({ limit: 100 }).then((res) => {
-      if (res.success) {
-        setProducts(res.items)
-        if (res.items[0]) {
-          setProductId(res.items[0].id)
-          setScale(res.items[0].scale || 'unit')
-        }
-      }
-    })
+    setProductId('')
+    setProducts([])
   }, [open])
 
   useEffect(() => {
@@ -67,7 +59,7 @@ export function StockOutDialog({
     void fetchControlProductOptions({
       categoryId: categoryId || undefined,
       subcategoryId: subcategoryId || undefined,
-      limit: 100,
+      limit: 50,
     }).then((res) => {
       if (cancelled || !res.success) return
       setProducts(res.items)

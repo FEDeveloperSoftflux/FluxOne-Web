@@ -261,7 +261,7 @@ export async function fetchControlProductOptions({
   categoryId,
   subcategoryId,
   q,
-  limit = 100,
+  limit = 50,
 } = {}) {
   const result = await apiClient.get(endpoints.products.list, {
     page: 1,

@@ -12,9 +12,13 @@ import {
   listStockIn,
   listStockOut,
   listStockTransfers,
-  removeMovement,
+  removeAdjustment,
+  removeDamaged,
+  removeExpired,
   stockInFromOrder,
-  updateMovement,
+  updateAdjustment,
+  updateDamaged,
+  updateExpired,
 } from './control.controller.js'
 import { asyncHandler } from '../../../middlewares/error.middleware.js'
 import { requirePermission } from '../../../middlewares/role.middleware.js'
@@ -52,13 +56,13 @@ router.patch(
   '/adjustments/:id',
   requirePermission('stock:write'),
   validate(patchMovementSchema),
-  asyncHandler(updateMovement),
+  asyncHandler(updateAdjustment),
 )
 router.delete(
   '/adjustments/:id',
   requirePermission('stock:write'),
   validate(ledgerIdParamsSchema),
-  asyncHandler(removeMovement),
+  asyncHandler(removeAdjustment),
 )
 
 router.get('/damaged', requirePermission('stock:read'), validate(listLedgerSchema), asyncHandler(listDamaged))
@@ -67,13 +71,13 @@ router.patch(
   '/damaged/:id',
   requirePermission('stock:write'),
   validate(patchMovementSchema),
-  asyncHandler(updateMovement),
+  asyncHandler(updateDamaged),
 )
 router.delete(
   '/damaged/:id',
   requirePermission('stock:write'),
   validate(ledgerIdParamsSchema),
-  asyncHandler(removeMovement),
+  asyncHandler(removeDamaged),
 )
 
 router.get('/expired', requirePermission('stock:read'), validate(listLedgerSchema), asyncHandler(listExpired))
@@ -82,13 +86,13 @@ router.patch(
   '/expired/:id',
   requirePermission('stock:write'),
   validate(patchMovementSchema),
-  asyncHandler(updateMovement),
+  asyncHandler(updateExpired),
 )
 router.delete(
   '/expired/:id',
   requirePermission('stock:write'),
   validate(ledgerIdParamsSchema),
-  asyncHandler(removeMovement),
+  asyncHandler(removeExpired),
 )
 
 router.get('/transfers', requirePermission('stock:read'), validate(listLedgerSchema), asyncHandler(listStockTransfers))

@@ -1,20 +1,23 @@
 import { PATHS } from '@/router/paths'
 import { ROLES } from '@/lib/constants'
 
-/** Shared top-nav links by role — BM currently only Dashboard + Staff */
+// Shared top-nav links by role — BM currently only Dashboard + Staff
+const INVENTORY_NAV = [
+  { to: PATHS.inventory.dashboard, label: 'Dashboard', end: true },
+  { to: PATHS.inventory.categories, label: 'Categories', end: false },
+  { to: PATHS.inventory.products, label: 'Products', end: false },
+  { to: PATHS.inventory.control, label: 'Control', end: false },
+  { to: PATHS.inventory.suppliers, label: 'Suppliers', end: false },
+  { to: PATHS.inventory.orders, label: 'Orders', end: false },
+]
+
 export const NAV_BY_ROLE = {
   [ROLES.BRANCH_MANAGER]: [
     { to: PATHS.branch.dashboard, label: 'Dashboard', end: true },
     { to: PATHS.branch.staff, label: 'Staff', end: false },
   ],
-  [ROLES.INVENTORY_MANAGER]: [
-    { to: PATHS.inventory.dashboard, label: 'Dashboard', end: true },
-    { to: PATHS.inventory.categories, label: 'Categories', end: false },
-    { to: PATHS.inventory.products, label: 'Products', end: false },
-    { to: PATHS.inventory.control, label: 'Control', end: false },
-    { to: PATHS.inventory.suppliers, label: 'Suppliers', end: false },
-    { to: PATHS.inventory.orders, label: 'Orders', end: false }
-  ],
+  [ROLES.INVENTORY_MANAGER]: INVENTORY_NAV,
+  [ROLES.B2B_ADMIN]: INVENTORY_NAV,
 }
 
 export function getNavItemsForRole(role) {

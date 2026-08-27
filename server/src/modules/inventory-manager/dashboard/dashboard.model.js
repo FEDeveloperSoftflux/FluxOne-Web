@@ -78,22 +78,22 @@ export async function listStockOutGraph(tenantId, { from, to } = {}) {
           l.product_id
         FROM inventory_ledger l
         WHERE l.tenant_id = $1
-          AND l.movement_type = 'out'
+          AND l.movement_type IN ('out', 'damaged', 'expired')
           AND ($2::date IS NULL OR l.created_at::date >= $2::date)
           AND ($3::date IS NULL OR l.created_at::date <= $3::date)
         GROUP BY l.product_id
-        ORDER BY sum(l.quantity) DESC
+        ORDER BY sum(ABS(l.quantity)) DESC
         LIMIT 10
       )
       SELECT
         p.name,
         date_trunc('day', l.created_at)::date AS day,
-        sum(l.quantity)::numeric AS quantity
+        sum(ABS(l.quantity))::numeric AS quantity
       FROM inventory_ledger l
       JOIN TopItems ti ON ti.product_id = l.product_id
       JOIN products p ON p.id = l.product_id AND p.tenant_id = l.tenant_id
       WHERE l.tenant_id = $1
-        AND l.movement_type = 'out'
+        AND l.movement_type IN ('out', 'damaged', 'expired')
         AND ($2::date IS NULL OR l.created_at::date >= $2::date)
         AND ($3::date IS NULL OR l.created_at::date <= $3::date)
       GROUP BY p.name, day

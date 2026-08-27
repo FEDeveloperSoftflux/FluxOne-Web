@@ -20,9 +20,7 @@ import {
   fetchEmployeeLookups,
 } from '@/hooks/useInventoryControl'
 
-/**
- * Create / edit damaged item (employee + location + reason required).
- */
+// Create / edit damaged item (employee + location + reason required).
 export function DamagedDialog({
   open,
   onOpenChange,
@@ -75,15 +73,8 @@ export function DamagedDialog({
     setDamagedLocation('warehouse')
     setReason('')
     setDamagedByUserId('')
-    void fetchControlProductOptions({ limit: 100 }).then((res) => {
-      if (res.success) {
-        setProducts(res.items)
-        if (res.items[0]) {
-          setProductId(res.items[0].id)
-          setScale(res.items[0].scale || 'unit')
-        }
-      }
-    })
+    setProductId('')
+    setProducts([])
   }, [open, isEdit, initial])
 
   useEffect(() => {
@@ -92,14 +83,11 @@ export function DamagedDialog({
     void fetchControlProductOptions({
       categoryId: categoryId || undefined,
       subcategoryId: subcategoryId || undefined,
-      limit: 100,
+      limit: 50,
     }).then((res) => {
       if (cancelled || !res.success) return
       setProducts(res.items)
-      if (res.items[0]) {
-        setProductId(res.items[0].id)
-        setScale(res.items[0].scale || 'unit')
-      } else setProductId('')
+      setProductId((prev) => (res.items.some((p) => p.id === prev) ? prev : ''))
     })
     return () => {
       cancelled = true
@@ -203,13 +191,16 @@ export function DamagedDialog({
                   if (p) setScale(p.scale || 'unit')
                 }}
               >
-                {!products.length ? <option value="">No products</option> : null}
+                <option value="">Select product</option>
                 {products.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name} (on hand: {p.quantity})
                   </option>
                 ))}
               </NativeSelect>
+              {!products.length ? (
+                <p className="text-xs text-amber-700">No products match these filters.</p>
+              ) : null}
             </div>
             <div className="space-y-1.5">
               <Label>Scale</Label>

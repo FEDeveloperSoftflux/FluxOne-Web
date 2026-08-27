@@ -4,11 +4,11 @@ import { StockAlertsTable } from '@/components/feature/dashboard/StockAlertsTabl
 import { StockOutChart } from '@/components/feature/dashboard/StockOutChart'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { SlowLoadingBanner, useSlowLoadingHint } from '@/components/shared/SlowLoadingBanner'
 import { Button } from '@/components/ui/button'
 import { useAuthSession } from '@/hooks/useAuthSession'
 import { useInventoryDashboard } from '@/hooks/useInventoryDashboard'
 import { toastError } from '@/lib/toast'
-import { cn } from '@/lib/utils'
 
 export function DashboardPage() {
   const { user } = useAuthSession()
@@ -24,6 +24,8 @@ export function DashboardPage() {
     error,
     reload,
   } = useInventoryDashboard()
+
+  const slowHint = useSlowLoadingHint(loading || alertsLoading)
 
   const lastErrorRef = useRef(null)
   useEffect(() => {
@@ -48,7 +50,7 @@ export function DashboardPage() {
               size="sm"
               disabled={loading}
               onClick={reload}
-              className="w-full cursor-pointer sm:w-auto"
+              className="w-full sm:w-auto"
             >
               Refresh
             </Button>
@@ -56,9 +58,11 @@ export function DashboardPage() {
         />
       </MotionHeader>
 
+      <SlowLoadingBanner show={slowHint} />
+
       <div className="space-y-5 sm:space-y-6">
         <MotionReveal delay={0.04}>
-          <div className={cn(loading && 'opacity-60 transition-opacity')}>
+          <div>
             <p className="mb-3 text-xs font-semibold tracking-[0.12em] text-slate-400 uppercase">
               Inventory overview KPIs
             </p>
@@ -68,19 +72,15 @@ export function DashboardPage() {
 
         <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2 xl:gap-6">
           <MotionReveal delay={0.08}>
-            <div className={cn(alertsLoading && 'opacity-60 transition-opacity')}>
-              <StockAlertsTable
-                items={alerts}
-                loading={alertsLoading || loading}
-                pagination={alertsPagination}
-                onPageChange={setAlertsPage}
-              />
-            </div>
+            <StockAlertsTable
+              items={alerts}
+              loading={alertsLoading || loading}
+              pagination={alertsPagination}
+              onPageChange={setAlertsPage}
+            />
           </MotionReveal>
           <MotionReveal delay={0.1}>
-            <div className={cn(loading && 'opacity-60 transition-opacity')}>
-              <StockOutChart items={stockOutPie} loading={loading} />
-            </div>
+            <StockOutChart items={stockOutPie} loading={loading} />
           </MotionReveal>
         </div>
       </div>

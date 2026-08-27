@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { Pagination } from '@/components/shared/Pagination'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
+import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { money } from '@/lib/mapProduct'
 
 export function ProductTable({
@@ -38,11 +39,7 @@ export function ProductTable({
       }
     >
       {loading ? (
-        <div className="space-y-3 py-4">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-14 animate-pulse rounded-xl bg-slate-100" />
-          ))}
-        </div>
+        <TableRowsSkeleton rows={6} />
       ) : isEmpty ? (
         <EmptyState
           icon={Package}

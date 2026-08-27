@@ -5,6 +5,7 @@ import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { NativeSelect } from '@/components/ui/select'
+import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { staffInitials } from '@/lib/mapBranchDashboard'
 import { BRAND } from '@/lib/constants'
 
@@ -66,11 +67,7 @@ export function StaffTable({
       }
     >
       {loading ? (
-        <div className="space-y-3 py-6">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="h-12 animate-pulse rounded-xl bg-slate-100" />
-          ))}
-        </div>
+        <TableRowsSkeleton rows={5} />
       ) : isEmpty ? (
         <EmptyState
           icon={Users}

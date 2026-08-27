@@ -1,6 +1,7 @@
 import { memo, useMemo, useState } from 'react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
+import { ChartSkeleton } from '@/components/ui/skeleton'
 import { PIE_COLORS } from '@/lib/mapInventoryDashboard'
 import { cn } from '@/lib/utils'
 
@@ -52,7 +53,7 @@ function StockOutChartComponent({
         className,
       )}
       title="Stock Graph"
-      description="Top 10 most stocked-out items"
+      description="Top 10 items leaving stock (sales, damaged, expired)"
       actions={
         <span className="text-xs font-medium text-slate-400">
           {chartData.length} item{chartData.length === 1 ? '' : 's'}
@@ -60,14 +61,12 @@ function StockOutChartComponent({
       }
     >
       {loading ? (
-        <div className="flex h-[280px] items-center justify-center">
-          <div className="size-40 animate-pulse rounded-full bg-slate-100" />
-        </div>
+        <ChartSkeleton />
       ) : isEmpty ? (
         <div className="flex h-[280px] flex-col items-center justify-center gap-2 text-center">
           <p className="text-sm font-semibold text-slate-800">No stock-out activity yet</p>
           <p className="max-w-xs text-xs text-slate-500">
-            When items leave inventory, the top movers will appear in this chart.
+            Sales, damaged, and expired movements will show the top movers here.
           </p>
         </div>
       ) : (

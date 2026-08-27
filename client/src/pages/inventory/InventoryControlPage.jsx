@@ -5,17 +5,16 @@ import { AdjustmentDialog } from '@/components/feature/control/AdjustmentDialog'
 import { AdjustmentTable } from '@/components/feature/control/AdjustmentTable'
 import { DamagedDialog } from '@/components/feature/control/DamagedDialog'
 import { DamagedTable } from '@/components/feature/control/DamagedTable'
-import { ExpiredDialog } from '@/components/feature/control/ExpiredDialog'
 import { ExpiredTable } from '@/components/feature/control/ExpiredTable'
 import { InventoryControlTabs } from '@/components/feature/control/InventoryControlTabs'
 import { MovementFilters } from '@/components/feature/control/MovementFilters'
 import { OrderDemandDialog } from '@/components/feature/control/OrderDemandDialog'
 import { StockInTable } from '@/components/feature/control/StockInTable'
-import { StockOutDialog } from '@/components/feature/control/StockOutDialog'
 import { StockOutTable } from '@/components/feature/control/StockOutTable'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { SlowLoadingBanner, useSlowLoadingHint } from '@/components/shared/SlowLoadingBanner'
 import { Button } from '@/components/ui/button'
 import { useInventoryControl } from '@/hooks/useInventoryControl'
 import { BRAND } from '@/lib/constants'
@@ -34,6 +33,15 @@ function useDebouncedSearch(updateFilters) {
 
   return { localQ, setLocalQ, onSearchChange }
 }
+
+/** Tabs that expose an “Add …” CTA (Stock Out / Expired are history-only). */
+const TABS_WITH_ADD = new Set([
+  MOVEMENT_TYPES.IN,
+  MOVEMENT_TYPES.ADJUSTMENT,
+  MOVEMENT_TYPES.DAMAGED,
+])
+
+const TABS_WITH_EDIT = new Set([MOVEMENT_TYPES.ADJUSTMENT, MOVEMENT_TYPES.DAMAGED])
 
 function ControlTabPanel({ tab }) {
   const {
@@ -59,6 +67,10 @@ function ControlTabPanel({ tab }) {
   const [orderOpen, setOrderOpen] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
+
+  const canAdd = TABS_WITH_ADD.has(tab)
+  const canEdit = TABS_WITH_EDIT.has(tab)
+  const slowHint = useSlowLoadingHint(loading)
 
   function handleFilterChange(patch) {
     if (patch.q !== undefined) setLocalQ(patch.q)
@@ -102,39 +114,41 @@ function ControlTabPanel({ tab }) {
     return result
   }
 
-  const titleActions = (
-    <>
-      {tab === MOVEMENT_TYPES.IN ? (
-        <Button
-          type="button"
-          variant="outline"
-          className="cursor-pointer"
-          style={{ color: BRAND.deep }}
-          onClick={() => setOrderOpen(true)}
-        >
-          <ClipboardList className="size-4" />
-          By order demand
-        </Button>
-      ) : null}
-      <Button
-        type="button"
-        className="cursor-pointer text-white"
-        style={{ background: BRAND.purple }}
-        onClick={() => setAddOpen(true)}
-      >
-        <Plus className="size-4" />
-        {tab === MOVEMENT_TYPES.IN
-          ? 'Add stock'
-          : tab === MOVEMENT_TYPES.OUT
-            ? 'Add stock out'
-            : tab === MOVEMENT_TYPES.ADJUSTMENT
-              ? 'Add adjustment'
-              : tab === MOVEMENT_TYPES.DAMAGED
-                ? 'Add damaged'
-                : 'Add expired'}
-      </Button>
-    </>
-  )
+  const addLabel =
+    tab === MOVEMENT_TYPES.IN
+      ? 'Add stock'
+      : tab === MOVEMENT_TYPES.ADJUSTMENT
+        ? 'Add adjustment'
+        : 'Add damaged'
+
+  const titleActions =
+    tab === MOVEMENT_TYPES.IN || canAdd ? (
+      <>
+        {tab === MOVEMENT_TYPES.IN ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="cursor-pointer"
+            style={{ color: BRAND.deep }}
+            onClick={() => setOrderOpen(true)}
+          >
+            <ClipboardList className="size-4" />
+            By order demand
+          </Button>
+        ) : null}
+        {canAdd ? (
+          <Button
+            type="button"
+            className="cursor-pointer text-white"
+            style={{ background: BRAND.purple }}
+            onClick={() => setAddOpen(true)}
+          >
+            <Plus className="size-4" />
+            {addLabel}
+          </Button>
+        ) : null}
+      </>
+    ) : null
 
   return (
     <div className="space-y-4">
@@ -144,7 +158,25 @@ function ControlTabPanel({ tab }) {
         </p>
       ) : null}
 
-      <div className="flex flex-wrap items-center justify-end gap-2">{titleActions}</div>
+      <SlowLoadingBanner show={slowHint} />
+
+      {titleActions ? (
+        <div className="flex flex-wrap items-center justify-end gap-2">{titleActions}</div>
+      ) : null}
+
+      {tab === MOVEMENT_TYPES.OUT ? (
+        <p className="rounded-xl border border-dashed border-border bg-slate-50/80 px-3 py-2 text-sm text-slate-600">
+          Stock out is recorded automatically from sales, damaged, expired, and negative adjustments —
+          history only on this tab.
+        </p>
+      ) : null}
+
+      {tab === MOVEMENT_TYPES.EXPIRED ? (
+        <p className="rounded-xl border border-dashed border-border bg-slate-50/80 px-3 py-2 text-sm text-slate-600">
+          Expired stock is processed automatically from stock-in lots past their expiry date. Set an
+          expiry when adding stock.
+        </p>
+      ) : null}
 
       <MotionReveal delay={0.04}>
         <MovementFilters
@@ -203,8 +235,6 @@ function ControlTabPanel({ tab }) {
             loading={loading}
             pagination={pagination}
             onPageChange={setPage}
-            onEdit={setEditTarget}
-            onDelete={setDeleteTarget}
           />
         ) : null}
       </MotionReveal>
@@ -225,16 +255,6 @@ function ControlTabPanel({ tab }) {
             onReceive={handleReceiveOrder}
           />
         </>
-      ) : null}
-
-      {tab === MOVEMENT_TYPES.OUT ? (
-        <StockOutDialog
-          open={addOpen}
-          onOpenChange={setAddOpen}
-          catalog={catalog}
-          loading={mutating}
-          onSubmit={handleCreate}
-        />
       ) : null}
 
       {tab === MOVEMENT_TYPES.ADJUSTMENT ? (
@@ -285,45 +305,23 @@ function ControlTabPanel({ tab }) {
         </>
       ) : null}
 
-      {tab === MOVEMENT_TYPES.EXPIRED ? (
-        <>
-          <ExpiredDialog
-            open={addOpen}
-            onOpenChange={setAddOpen}
-            mode="create"
-            catalog={catalog}
-            loading={mutating}
-            onSubmit={handleCreate}
-          />
-          <ExpiredDialog
-            open={Boolean(editTarget)}
-            onOpenChange={(open) => {
-              if (!open) setEditTarget(null)
-            }}
-            mode="edit"
-            initial={editTarget}
-            catalog={catalog}
-            loading={mutating}
-            onSubmit={handleUpdate}
-          />
-        </>
+      {canEdit ? (
+        <ConfirmDialog
+          open={Boolean(deleteTarget)}
+          onOpenChange={(open) => {
+            if (!open) setDeleteTarget(null)
+          }}
+          title="Delete this record?"
+          description={
+            deleteTarget
+              ? `Remove this ${tab} entry for ${deleteTarget.productName || 'item'}? On-hand stock will be reversed.`
+              : undefined
+          }
+          confirmLabel="Delete"
+          loading={mutating}
+          onConfirm={handleConfirmDelete}
+        />
       ) : null}
-
-      <ConfirmDialog
-        open={Boolean(deleteTarget)}
-        onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null)
-        }}
-        title="Delete this record?"
-        description={
-          deleteTarget
-            ? `Remove this ${tab} entry for ${deleteTarget.productName || 'item'}? On-hand stock will be reversed.`
-            : undefined
-        }
-        confirmLabel="Delete"
-        loading={mutating}
-        onConfirm={handleConfirmDelete}
-      />
     </div>
   )
 }
@@ -345,7 +343,6 @@ export function InventoryControlPage() {
         <InventoryControlTabs value={tab} onChange={setTab} />
       </MotionReveal>
 
-      {/* Remount panel per tab so each keeps its own list state cleanly */}
       <ControlTabPanel key={tab} tab={tab} />
     </div>
   )

@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { Boxes, FolderTree, Layers } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
 import { BRAND } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 
@@ -53,7 +54,7 @@ function InventoryKpiCardsComponent({ kpis = {}, loading = false, className }) {
                   {meta.label}
                 </p>
                 {loading ? (
-                  <div className="mt-3 h-8 w-20 animate-pulse rounded-lg bg-slate-100" />
+                  <Skeleton className="mt-3 h-8 w-20 rounded-lg" />
                 ) : (
                   <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
                     {formatCount(kpis[meta.key])}

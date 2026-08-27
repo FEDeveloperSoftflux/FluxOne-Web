@@ -3,6 +3,7 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { Pagination } from '@/components/shared/Pagination'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
+import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { BRAND } from '@/lib/constants'
 import { ProductStatusToggle } from '@/components/feature/products/ProductStatusToggle'
 
@@ -37,11 +38,7 @@ export function SupplierTable({
       }
     >
       {loading ? (
-        <div className="space-y-3 py-4">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="h-14 animate-pulse rounded-xl bg-slate-100" />
-          ))}
-        </div>
+        <TableRowsSkeleton rows={5} />
       ) : isEmpty ? (
         <EmptyState
           icon={Building2}
@@ -49,8 +46,8 @@ export function SupplierTable({
           description="Add a supplier before generating purchase orders."
         />
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[960px] border-collapse text-left text-sm">
+        <div className="overflow-x-auto -mx-1 px-1 sm:mx-0 sm:px-0">
+          <table className="w-full min-w-[720px] border-collapse text-left text-sm lg:min-w-[960px]">
             <thead>
               <tr className="border-b border-border text-xs uppercase tracking-wide text-slate-400">
                 <th className="px-2 py-3 font-semibold">Image</th>

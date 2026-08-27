@@ -24,7 +24,7 @@ export function InventoryControlTabs({ value, onChange, className }) {
             type="button"
             onClick={() => onChange?.(tab.id)}
             className={cn(
-              'cursor-pointer rounded-full border px-4 py-2 text-sm font-semibold transition-all',
+              'cursor-pointer rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200 active:scale-[0.97] sm:px-4 sm:py-2 sm:text-sm',
               active
                 ? 'border-transparent text-white shadow-sm'
                 : 'border-border bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
@@ -36,7 +36,7 @@ export function InventoryControlTabs({ value, onChange, className }) {
         )
       })}
       <span
-        className="inline-flex items-center rounded-full border border-dashed border-border px-4 py-2 text-xs font-medium text-slate-400"
+        className="inline-flex items-center rounded-full border border-dashed border-border px-3 py-1.5 text-[11px] font-medium text-slate-400 sm:px-4 sm:py-2 sm:text-xs"
         title="Stock Transfer UI ships in Phase 2"
       >
         Transfer · Phase 2

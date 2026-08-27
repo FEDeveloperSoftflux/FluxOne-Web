@@ -22,15 +22,18 @@ import {
 function toDateInput(value) {
   if (!value) return ''
   try {
-    return new Date(value).toISOString().slice(0, 10)
+    const d = new Date(value)
+    if (Number.isNaN(d.getTime())) return ''
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
   } catch {
     return ''
   }
 }
 
-/**
- * Create / edit expired product record.
- */
+// Create / edit expired product record.
 export function ExpiredDialog({
   open,
   onOpenChange,
@@ -82,15 +85,8 @@ export function ExpiredDialog({
     setExpiresAt('')
     setSupplierId('')
     setReason('')
-    void fetchControlProductOptions({ limit: 100 }).then((res) => {
-      if (res.success) {
-        setProducts(res.items)
-        if (res.items[0]) {
-          setProductId(res.items[0].id)
-          setScale(res.items[0].scale || 'unit')
-        }
-      }
-    })
+    setProductId('')
+    setProducts([])
   }, [open, isEdit, initial])
 
   useEffect(() => {
@@ -99,7 +95,7 @@ export function ExpiredDialog({
     void fetchControlProductOptions({
       categoryId: categoryId || undefined,
       subcategoryId: subcategoryId || undefined,
-      limit: 100,
+      limit: 50,
     }).then((res) => {
       if (cancelled || !res.success) return
       setProducts(res.items)

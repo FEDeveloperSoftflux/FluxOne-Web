@@ -34,8 +34,8 @@ function MobileNavLinks({ items, onNavigate }) {
           onClick={onNavigate}
           className={({ isActive }) =>
             cn(
-              'relative shrink-0 rounded-xl px-3 py-3 text-sm font-semibold whitespace-nowrap transition-colors',
-              isActive ? 'text-[#8E238F]' : 'text-slate-700 hover:text-[#8E238F]',
+              'relative shrink-0 cursor-pointer rounded-xl px-3 py-3 text-sm font-semibold whitespace-nowrap transition-colors duration-200 active:scale-[0.99]',
+              isActive ? 'text-[#8E238F] bg-[#f3e8f5]/60' : 'text-slate-700 hover:bg-slate-50 hover:text-[#8E238F]',
             )
           }
         >
@@ -103,7 +103,7 @@ function MobileDrawer({ open, onClose, items }) {
                 type="button"
                 aria-label="Close navigation"
                 onClick={onClose}
-                className="flex size-10 items-center justify-center rounded-xl border border-border text-slate-600 hover:bg-slate-50"
+                className="flex size-10 cursor-pointer items-center justify-center rounded-xl border border-border text-slate-600 transition-colors hover:bg-slate-50 active:scale-95"
               >
                 <X className="size-5" />
               </button>
@@ -130,7 +130,7 @@ function MobileDrawer({ open, onClose, items }) {
             <div className="mt-auto space-y-1 border-t border-border p-3">
               <button
                 type="button"
-                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 active:scale-[0.99]"
                 onClick={() => {
                   onClose()
                   navigate(profilePath)
@@ -141,7 +141,7 @@ function MobileDrawer({ open, onClose, items }) {
               </button>
               <button
                 type="button"
-                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-3 text-sm font-medium text-red-600 hover:bg-red-50"
+                className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 active:scale-[0.99]"
                 onClick={() => {
                   onClose()
                   logout()
@@ -169,7 +169,7 @@ export function MobileNav({ items }) {
         type="button"
         aria-label="Open navigation menu"
         aria-expanded={open}
-        className="flex size-10 items-center justify-center rounded-xl border border-border text-slate-700 hover:bg-slate-50 md:hidden"
+        className="flex size-10 cursor-pointer items-center justify-center rounded-xl border border-border text-slate-700 transition-colors hover:bg-slate-50 active:scale-95 md:hidden"
         onClick={() => setOpen(true)}
       >
         <Menu className="size-5" />

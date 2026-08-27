@@ -5,6 +5,7 @@ import { StockStatusDot } from '@/components/feature/dashboard/StockStatusDot'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { Pagination } from '@/components/shared/Pagination'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
+import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { sourceLabel, STOCK_STATUS_META } from '@/lib/mapInventoryDashboard'
 import { cn } from '@/lib/utils'
 
@@ -60,11 +61,7 @@ function StockAlertsTableComponent({
       }
     >
       {loading ? (
-        <div className="space-y-3 py-4">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-12 animate-pulse rounded-xl bg-slate-100" />
-          ))}
-        </div>
+        <TableRowsSkeleton rows={5} />
       ) : isEmpty ? (
         <EmptyState
           icon={Bell}
@@ -143,6 +140,10 @@ function StockAlertsTableComponent({
             loading={loading}
             onPageChange={onPageChange}
           />
+
+          <div className="mt-4 border-t border-border pt-3">
+            <StockLegend />
+          </div>
         </>
       )}
     </SurfaceCard>

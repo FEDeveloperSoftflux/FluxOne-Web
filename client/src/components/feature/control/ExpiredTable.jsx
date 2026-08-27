@@ -9,8 +9,6 @@ export function ExpiredTable({
   loading,
   pagination,
   onPageChange,
-  onEdit,
-  onDelete,
   className,
 }) {
   const columns = [
@@ -46,16 +44,14 @@ export function ExpiredTable({
   return (
     <MovementHistoryTable
       title="Expired products"
-      description="Expired stock removals"
+      description="Lots past expiry — processed automatically from stock-in"
       items={items}
       loading={loading}
       pagination={pagination}
       columns={columns}
       onPageChange={onPageChange}
-      onEdit={onEdit}
-      onDelete={onDelete}
       emptyTitle="No expired records"
-      emptyHint="Record expired products with an expiry date."
+      emptyHint="When stock-in lots pass their expiry date, they appear here automatically."
       className={className}
     />
   )

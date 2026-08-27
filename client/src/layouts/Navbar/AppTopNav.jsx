@@ -17,7 +17,7 @@ function DesktopNavLinks({ items }) {
           end={item.end}
           className={({ isActive }) =>
             cn(
-              'relative flex shrink-0 items-center px-3 text-sm font-semibold whitespace-nowrap transition-colors',
+              'relative flex shrink-0 cursor-pointer items-center px-3 text-sm font-semibold whitespace-nowrap transition-colors duration-200',
               isActive ? 'text-[#8E238F]' : 'text-slate-800 hover:text-[#8E238F]',
             )
           }

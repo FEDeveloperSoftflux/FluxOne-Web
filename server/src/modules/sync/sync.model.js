@@ -35,7 +35,12 @@ async function insertSyncEventInTx(client, tenantId, event) {
       VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7)
       ON CONFLICT (tenant_id, client_event_id) DO UPDATE
       SET payload = EXCLUDED.payload
-      RETURNING id, client_event_id AS "clientEventId", event_type AS "eventType", payload
+      RETURNING
+        id,
+        client_event_id AS "clientEventId",
+        event_type AS "eventType",
+        payload,
+        branch_id AS "branchId"
     `,
     [
       event.branchId || null,
@@ -77,6 +82,9 @@ async function processPosInventoryEvent(client, tenantId, syncEvent, userId) {
   const reason = parsed.data.reason || `POS ${syncEvent.eventType}`
   const ledgerLines = []
 
+  // Prefer branch on the sync event row
+  const branchId = syncEvent.branchId || null
+
   for (const line of parsed.data.lines) {
     ledgerLines.push(
       await insertLedgerEventInTx(client, tenantId, {
@@ -86,6 +94,7 @@ async function processPosInventoryEvent(client, tenantId, syncEvent, userId) {
         scale: line.scale || 'unit',
         reason,
         posEventId: syncEvent.id,
+        branchId,
         createdBy: userId,
       }),
     )

@@ -3,6 +3,7 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { Pagination } from '@/components/shared/Pagination'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
+import { TableRowsSkeleton } from '@/components/ui/skeleton'
 
 function statusClass(status) {
   if (status === 'approved') return 'bg-emerald-50 text-emerald-700'
@@ -42,11 +43,7 @@ export function OrderTable({
       }
     >
       {loading ? (
-        <div className="space-y-3 py-4">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="h-12 animate-pulse rounded-xl bg-slate-100" />
-          ))}
-        </div>
+        <TableRowsSkeleton rows={5} />
       ) : isEmpty ? (
         <EmptyState
           icon={ClipboardList}

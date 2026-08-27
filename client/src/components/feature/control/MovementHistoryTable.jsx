@@ -4,6 +4,7 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { Pagination } from '@/components/shared/Pagination'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
+import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { formatMovementDateTime, shortId } from '@/lib/mapStockMovement'
 import { cn } from '@/lib/utils'
 
@@ -44,17 +45,13 @@ export function MovementHistoryTable({
       }
     >
       {loading ? (
-        <div className="space-y-3 py-4">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-14 animate-pulse rounded-xl bg-slate-100" />
-          ))}
-        </div>
+        <TableRowsSkeleton rows={6} />
       ) : isEmpty ? (
         <EmptyState icon={Package} title={emptyTitle} description={emptyHint} />
       ) : (
         <>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+          <div className="overflow-x-auto -mx-1 px-1 sm:mx-0 sm:px-0">
+            <table className="w-full min-w-[640px] border-collapse text-left text-sm md:min-w-[720px]">
               <thead>
                 <tr className="border-b border-border text-xs tracking-wide text-slate-400 uppercase">
                   {columns.map((col) => (

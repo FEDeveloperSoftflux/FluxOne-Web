@@ -15,10 +15,8 @@ import {
 } from '@/hooks/useInventoryControl'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 
-/**
- * List approved POs → confirm → POST stock-in/from-order.
- * Control “Approved” action = receive into stock (not PO approve).
- */
+// List approved POs → confirm → POST stock-in/from-order.
+
 export function OrderDemandDialog({ open, onOpenChange, loading = false, onReceive }) {
   const [orders, setOrders] = useState([])
   const [loadError, setLoadError] = useState(null)
@@ -129,7 +127,7 @@ export function OrderDemandDialog({ open, onOpenChange, loading = false, onRecei
                       disabled={loading}
                       onClick={() => setConfirmTarget(order)}
                     >
-                      Approved
+                      Receive
                     </Button>
                   </div>
                 </article>

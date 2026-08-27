@@ -3,6 +3,12 @@ import {
   movementImageNameColumns,
 } from '@/components/feature/control/MovementHistoryTable'
 
+const SOURCE_LABEL = {
+  out: 'Sale / stock out',
+  damaged: 'Damaged',
+  expired: 'Expired',
+}
+
 export function StockOutTable({
   items,
   loading,
@@ -18,6 +24,15 @@ export function StockOutTable({
       render: (row) => <span className="capitalize text-slate-700">{row.type || '—'}</span>,
     },
     {
+      key: 'source',
+      label: 'Source',
+      render: (row) => (
+        <span className="text-slate-600">
+          {SOURCE_LABEL[row.movementType] || row.movementType || '—'}
+        </span>
+      ),
+    },
+    {
       key: 'qty',
       label: 'Stock-out qty',
       render: (row) => (
@@ -29,14 +44,14 @@ export function StockOutTable({
   return (
     <MovementHistoryTable
       title="Stock out history"
-      description="Outbound stock removals"
+      description="Inventory leaving stock via sales, damaged, or expired"
       items={items}
       loading={loading}
       pagination={pagination}
       columns={columns}
       onPageChange={onPageChange}
       emptyTitle="No stock-out records"
-      emptyHint="Record a stock-out when inventory leaves the warehouse."
+      emptyHint="Damaged, expired, and POS sales appear here automatically."
       className={className}
     />
   )

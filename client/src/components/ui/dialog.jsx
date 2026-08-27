@@ -37,7 +37,7 @@ function DialogContent({ className, children }) {
       />
       <div
         className={cn(
-          'relative z-10 max-h-[90dvh] w-full overflow-y-auto rounded-t-2xl border bg-card p-5 shadow-lg sm:max-w-lg sm:rounded-xl sm:p-6',
+          'relative z-10 max-h-[92dvh] w-full overflow-y-auto rounded-t-2xl border bg-card p-4 shadow-lg sm:max-h-[90dvh] sm:max-w-lg sm:rounded-xl sm:p-6',
           className,
         )}
       >

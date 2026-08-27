@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -18,18 +18,17 @@ import {
   fetchControlProductOptions,
   fetchControlSuppliers,
 } from '@/hooks/useInventoryControl'
+import { cn } from '@/lib/utils'
 
-function emptyLine(product) {
-  return {
-    productId: product?.id || '',
-    scale: product?.scale || 'unit',
-    quantity: 1,
-    unitCost: product?.purchasePrice != null ? Number(product.purchasePrice) : '',
-  }
-}
+const STEPS = [
+  { id: 1, label: '1. Select Item' },
+  { id: 2, label: '2. Set Qty' },
+  { id: 3, label: '3. Confirm' },
+]
 
 /**
- * Multi-line stock-in dialog (optional supplier).
+ * 3-step Add Stock wizard (Select Item → Set Qty → Confirm).
+ * All selections use dropdowns; product starts unselected.
  */
 export function AddStockInDialog({
   open,
@@ -41,12 +40,17 @@ export function AddStockInDialog({
   const parents = catalog?.parents || []
   const childrenByParent = catalog?.childrenByParent
 
+  const [step, setStep] = useState(1)
   const [categoryId, setCategoryId] = useState('')
   const [subcategoryId, setSubcategoryId] = useState('')
-  const [supplierId, setSupplierId] = useState('')
-  const [suppliers, setSuppliers] = useState([])
+  const [productId, setProductId] = useState('')
   const [products, setProducts] = useState([])
-  const [lines, setLines] = useState([])
+  const [suppliers, setSuppliers] = useState([])
+  const [supplierId, setSupplierId] = useState('')
+  const [scale, setScale] = useState('unit')
+  const [quantity, setQuantity] = useState('1')
+  const [unitCost, setUnitCost] = useState('')
+  const [expiresAt, setExpiresAt] = useState('')
   const [error, setError] = useState(null)
   const [loadingOptions, setLoadingOptions] = useState(false)
 
@@ -55,22 +59,33 @@ export function AddStockInDialog({
     return childrenByParent.get(categoryId) || []
   }, [categoryId, childrenByParent])
 
+  const selectedProduct = useMemo(
+    () => products.find((p) => p.id === productId) || null,
+    [products, productId],
+  )
+
+  const selectedSupplier = useMemo(
+    () => suppliers.find((s) => s.id === supplierId) || null,
+    [suppliers, supplierId],
+  )
+
   useEffect(() => {
     if (!open) return
+    setStep(1)
     setError(null)
     setCategoryId('')
     setSubcategoryId('')
-    setSupplierId('')
-    setLines([])
+    setProductId('')
     setProducts([])
+    setSupplierId('')
+    setScale('unit')
+    setQuantity('1')
+    setUnitCost('')
+    setExpiresAt('')
     setLoadingOptions(true)
     void (async () => {
-      const [supRes, prodRes] = await Promise.all([
-        fetchControlSuppliers(),
-        fetchControlProductOptions({ limit: 100 }),
-      ])
+      const supRes = await fetchControlSuppliers()
       if (supRes.success) setSuppliers(supRes.items)
-      if (prodRes.success) setProducts(prodRes.items)
       setLoadingOptions(false)
     })()
   }, [open])
@@ -78,75 +93,66 @@ export function AddStockInDialog({
   useEffect(() => {
     if (!open) return
     let cancelled = false
-    void (async () => {
-      const result = await fetchControlProductOptions({
-        categoryId: categoryId || undefined,
-        subcategoryId: subcategoryId || undefined,
-        limit: 100,
-      })
-      if (cancelled) return
-      if (result.success) setProducts(result.items)
-    })()
+    void fetchControlProductOptions({
+      categoryId: categoryId || undefined,
+      subcategoryId: subcategoryId || undefined,
+      limit: 50,
+    }).then((res) => {
+      if (cancelled || !res.success) return
+      setProducts(res.items)
+      setProductId((prev) => (res.items.some((p) => p.id === prev) ? prev : ''))
+    })
     return () => {
       cancelled = true
     }
   }, [open, categoryId, subcategoryId])
 
-  function addLine() {
-    const first = products[0]
-    if (!first) {
-      setError('No products match the selected category filters')
+  function goNext() {
+    setError(null)
+    if (step === 1) {
+      if (!productId) {
+        setError('Select a product')
+        return
+      }
+      if (selectedProduct?.scale) setScale(selectedProduct.scale)
+      if (selectedProduct?.purchasePrice != null && unitCost === '') {
+        setUnitCost(String(selectedProduct.purchasePrice))
+      }
+      setStep(2)
       return
     }
+    if (step === 2) {
+      if (!scale || !(Number(quantity) > 0)) {
+        setError('Enter a valid scale and positive quantity')
+        return
+      }
+      setStep(3)
+    }
+  }
+
+  function goBack() {
     setError(null)
-    setLines((prev) => [...prev, emptyLine(first)])
-  }
-
-  function patchLine(index, field, value) {
-    setLines((prev) =>
-      prev.map((row, i) => {
-        if (i !== index) return row
-        const next = { ...row, [field]: value }
-        if (field === 'productId') {
-          const product = products.find((p) => p.id === value)
-          if (product) {
-            next.scale = product.scale || 'unit'
-            next.unitCost =
-              product.purchasePrice != null ? Number(product.purchasePrice) : next.unitCost
-          }
-        }
-        return next
-      }),
-    )
-  }
-
-  function removeLine(index) {
-    setLines((prev) => prev.filter((_, i) => i !== index))
+    setStep((s) => Math.max(1, s - 1))
   }
 
   async function handleSave() {
     setError(null)
-    if (!lines.length) {
-      setError('Add at least one item')
+    if (!productId || !(Number(quantity) > 0) || !scale) {
+      setError('Missing product, scale, or quantity')
       return
-    }
-    for (const line of lines) {
-      if (!line.productId || !(Number(line.quantity) > 0) || !line.scale) {
-        setError('Each line needs a product, scale, and positive quantity')
-        return
-      }
     }
     const payload = {
       supplierId: supplierId || undefined,
-      lines: lines.map((line) => ({
-        productId: line.productId,
-        scale: line.scale,
-        quantity: Number(line.quantity),
-        unitCost:
-          line.unitCost === '' || line.unitCost == null
-            ? undefined
-            : Number(line.unitCost),
-      })),
+      lines: [
+        {
+          productId,
+          scale,
+          quantity: Number(quantity),
+          unitCost:
+            unitCost === '' || unitCost == null ? undefined : Number(unitCost),
+          expiresAt: expiresAt || undefined,
+        },
+      ],
     }
     const result = await onSubmit?.(payload)
     if (result?.success) onOpenChange?.(false)
@@ -155,179 +161,253 @@ export function AddStockInDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Add new stock</DialogTitle>
-          <DialogDescription>
-            Receive one or more products in a single stock-in (optional supplier).
+          <DialogTitle>Add New Stock</DialogTitle>
+          <DialogDescription className="sr-only">
+            Multi-step stock-in: select item, set quantity, confirm.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="stockin-cat">Category</Label>
-            <NativeSelect
-              id="stockin-cat"
-              value={categoryId}
-              onChange={(e) => {
-                setCategoryId(e.target.value)
-                setSubcategoryId('')
-              }}
-            >
-              <option value="">All categories</option>
-              {parents.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </NativeSelect>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="stockin-sub">Sub category</Label>
-            <NativeSelect
-              id="stockin-sub"
-              value={subcategoryId}
-              disabled={!categoryId}
-              onChange={(e) => setSubcategoryId(e.target.value)}
-            >
-              <option value="">All in category</option>
-              {subs.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </NativeSelect>
-          </div>
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="stockin-supplier">Supplier (optional)</Label>
-            <NativeSelect
-              id="stockin-supplier"
-              value={supplierId}
-              onChange={(e) => setSupplierId(e.target.value)}
-            >
-              <option value="">No supplier</option>
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.companyName || s.name || s.id}
-                </option>
-              ))}
-            </NativeSelect>
-          </div>
-        </div>
+        <nav className="flex gap-1 border-b border-border pb-0" aria-label="Stock-in steps">
+          {STEPS.map((s) => {
+            const done = step > s.id
+            const active = step === s.id
+            return (
+              <div
+                key={s.id}
+                className={cn(
+                  'flex-1 border-b-2 pb-2 text-center text-sm font-semibold transition-colors',
+                  active
+                    ? 'border-transparent text-[#8E238F]'
+                    : done
+                      ? 'border-transparent text-emerald-600'
+                      : 'border-transparent text-slate-400',
+                )}
+                style={
+                  active
+                    ? { borderBottomColor: BRAND.purple, color: BRAND.purple }
+                    : done
+                      ? { borderBottomColor: '#16a34a' }
+                      : undefined
+                }
+              >
+                {s.label}
+              </div>
+            )
+          })}
+        </nav>
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label>Lines</Label>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="cursor-pointer"
-              disabled={loadingOptions || !products.length}
-              onClick={addLine}
-            >
-              <Plus className="size-4" />
-              Add item
-            </Button>
-          </div>
-
-          {!lines.length ? (
-            <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-sm text-slate-500">
-              Add one or more products for this stock-in.
-            </p>
-          ) : (
-            <div className="max-h-64 space-y-2 overflow-y-auto">
-              {lines.map((line, index) => (
-                <div
-                  key={index}
-                  className="grid grid-cols-12 items-end gap-2 rounded-lg border border-border bg-slate-50/60 p-2"
-                >
-                  <div className="col-span-12 space-y-1 sm:col-span-5">
-                    <Label className="text-xs">Product</Label>
-                    <NativeSelect
-                      value={line.productId}
-                      onChange={(e) => patchLine(index, 'productId', e.target.value)}
-                    >
-                      {products.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} ({p.itemCode || '—'})
-                        </option>
-                      ))}
-                    </NativeSelect>
-                  </div>
-                  <div className="col-span-4 space-y-1 sm:col-span-2">
-                    <Label className="text-xs">Scale</Label>
-                    <NativeSelect
-                      value={line.scale}
-                      onChange={(e) => patchLine(index, 'scale', e.target.value)}
-                    >
-                      {SCALE_OPTIONS.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </NativeSelect>
-                  </div>
-                  <div className="col-span-4 space-y-1 sm:col-span-2">
-                    <Label className="text-xs">Qty</Label>
-                    <Input
-                      type="number"
-                      min="0.001"
-                      step="any"
-                      value={line.quantity}
-                      onChange={(e) => patchLine(index, 'quantity', e.target.value)}
-                    />
-                  </div>
-                  <div className="col-span-3 space-y-1 sm:col-span-2">
-                    <Label className="text-xs">Unit cost</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={line.unitCost}
-                      onChange={(e) => patchLine(index, 'unitCost', e.target.value)}
-                    />
-                  </div>
-                  <div className="col-span-1 flex justify-end pb-0.5">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="cursor-pointer text-red-600"
-                      onClick={() => removeLine(index)}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+        {step === 1 ? (
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label>Category</Label>
+              <NativeSelect
+                value={categoryId}
+                onChange={(e) => {
+                  setCategoryId(e.target.value)
+                  setSubcategoryId('')
+                  setProductId('')
+                }}
+              >
+                <option value="">All Categories</option>
+                {parents.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </NativeSelect>
             </div>
-          )}
-        </div>
+            <div className="space-y-1.5">
+              <Label>Sub category</Label>
+              <NativeSelect
+                value={subcategoryId}
+                disabled={!categoryId}
+                onChange={(e) => {
+                  setSubcategoryId(e.target.value)
+                  setProductId('')
+                }}
+              >
+                <option value="">All</option>
+                {subs.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Item</Label>
+              <NativeSelect
+                value={productId}
+                onChange={(e) => {
+                  const id = e.target.value
+                  setProductId(id)
+                  const p = products.find((x) => x.id === id)
+                  if (p) setScale(p.scale || 'unit')
+                }}
+              >
+                <option value="">Select product</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                    {p.scale ? ` (${p.scale})` : ''}
+                  </option>
+                ))}
+              </NativeSelect>
+              {!products.length && !loadingOptions ? (
+                <p className="text-xs text-amber-700">No products match these filters.</p>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        {step === 2 ? (
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label>Scale</Label>
+              <NativeSelect value={scale} onChange={(e) => setScale(e.target.value)}>
+                {SCALE_OPTIONS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Quantity to Add</Label>
+              <Input
+                type="number"
+                min="0.001"
+                step="any"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Company / Supplier</Label>
+              <NativeSelect value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
+                <option value="">Select supplier (optional)</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.companyName || s.name || s.id}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Expiry date (optional)</Label>
+              <Input
+                type="date"
+                value={expiresAt}
+                onChange={(e) => setExpiresAt(e.target.value)}
+              />
+              <p className="text-xs text-slate-500">
+                When set, stock past this date is moved to Expired automatically.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Unit cost (optional)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="any"
+                value={unitCost}
+                onChange={(e) => setUnitCost(e.target.value)}
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {step === 3 ? (
+          <div className="pt-2">
+            <div
+              className="rounded-xl px-4 py-4 text-sm leading-relaxed text-slate-700"
+              style={{ background: BRAND.soft }}
+            >
+              Adding{' '}
+              <span className="font-bold" style={{ color: BRAND.purple }}>
+                {quantity} {scale}
+              </span>{' '}
+              of{' '}
+              <span className="font-bold" style={{ color: BRAND.purple }}>
+                {selectedProduct?.name || 'item'}
+              </span>
+              {selectedSupplier ? (
+                <>
+                  {' '}
+                  from{' '}
+                  <span className="font-bold" style={{ color: BRAND.purple }}>
+                    {selectedSupplier.companyName || selectedSupplier.name}
+                  </span>
+                </>
+              ) : null}
+              {expiresAt ? (
+                <>
+                  {' '}
+                  (expires{' '}
+                  <span className="font-bold" style={{ color: BRAND.purple }}>
+                    {expiresAt}
+                  </span>
+                  )
+                </>
+              ) : null}
+              . Confirm?
+            </div>
+          </div>
+        ) : null}
 
         {error ? (
           <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
         ) : null}
 
-        <DialogFooter>
+        <DialogFooter className="gap-2 sm:justify-end">
+          {step > 1 ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="cursor-pointer"
+              style={{ color: BRAND.purple, borderColor: BRAND.purple }}
+              disabled={loading}
+              onClick={goBack}
+            >
+              <ChevronLeft className="size-4" />
+              Back
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="outline"
             className="cursor-pointer"
+            style={{ color: BRAND.purple, borderColor: BRAND.purple }}
             disabled={loading}
             onClick={() => onOpenChange?.(false)}
           >
             Cancel
           </Button>
-          <Button
-            type="button"
-            className="cursor-pointer text-white"
-            style={{ background: BRAND.purple }}
-            disabled={loading || loadingOptions}
-            onClick={handleSave}
-          >
-            {loading ? 'Saving…' : 'Save stock-in'}
-          </Button>
+          {step < 3 ? (
+            <Button
+              type="button"
+              className="cursor-pointer text-white"
+              style={{ background: `linear-gradient(135deg, ${BRAND.purple}, ${BRAND.deep})` }}
+              disabled={loading || loadingOptions}
+              onClick={goNext}
+            >
+              Next
+              <ChevronRight className="size-4" />
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              className="cursor-pointer text-white"
+              style={{ background: `linear-gradient(135deg, ${BRAND.purple}, ${BRAND.deep})` }}
+              disabled={loading}
+              onClick={handleSave}
+            >
+              <Check className="size-4" />
+              {loading ? 'Saving…' : 'Save'}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

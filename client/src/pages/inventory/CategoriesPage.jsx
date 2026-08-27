@@ -7,6 +7,7 @@ import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
+import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { useProducts } from '@/hooks/useProducts'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
@@ -167,11 +168,7 @@ export function CategoriesPage() {
           }
         >
           {catalogLoading ? (
-            <div className="space-y-3 py-4">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="h-16 animate-pulse rounded-xl bg-slate-100" />
-              ))}
-            </div>
+            <TableRowsSkeleton rows={4} />
           ) : !rows.length ? (
             <div className="flex flex-col items-center gap-2 py-10 text-center text-sm text-slate-500">
               <FolderTree className="size-8 text-slate-300" />
