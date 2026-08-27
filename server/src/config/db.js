@@ -13,7 +13,6 @@ if (!databaseUrl) {
 export const pool = new Pool({
   connectionString: databaseUrl,
   max: 10,
-  /** Keep idle clients longer so warm connections survive between UI bursts. */
   idleTimeoutMillis: 120_000,
   connectionTimeoutMillis: 10_000,
   allowExitOnIdle: false,
@@ -28,13 +27,13 @@ function startPoolKeepAlive() {
   if (keepAliveTimer) return
   keepAliveTimer = setInterval(() => {
     pool.query('SELECT 1').catch(() => {
-      /* ignore — next real query will reconnect */
+      // ignore — next real query will reconnect
     })
   }, 25_000)
   keepAliveTimer.unref?.()
 }
 
-/** Prefer pool.query for one-shot reads/writes (avoids manual connect/release). */
+// Prefer pool.query for one-shot reads/writes (avoids manual connect/release).
 export async function query(text, params = []) {
   try {
     return await pool.query(text, params)

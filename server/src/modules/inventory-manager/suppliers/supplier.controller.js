@@ -44,7 +44,7 @@ export async function setActive(req, res) {
   return success(res, row)
 }
 
-/** Soft-deactivate (Active → Inactive). Keeps purchase order history intact. */
+// Soft-deactivate (Active → Inactive). Keeps purchase order history intact.
 export async function remove(req, res) {
   const deactivated = await deleteSupplier(req.tenantId, req.validated.params.id)
   if (!deactivated) return fail(res, 'Supplier not found', 404)

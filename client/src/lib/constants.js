@@ -21,10 +21,7 @@ export const ROLES = {
   B2B_ADMIN: 'b2b_admin',
 }
 
-/**
- * Seeded demo accounts (password for all: password).
- * Login sends only `id` + `password` — company is resolved by the API.
- */
+//Seeded demo accounts (password for all: password).
 export const DEMO_ACCOUNTS = [
   {
     tenantSlug: 'company-a',

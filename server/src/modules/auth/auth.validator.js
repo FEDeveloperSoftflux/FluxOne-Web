@@ -1,9 +1,7 @@
 import { z } from 'zod'
 
-/**
- * Single login form: id + password only.
- * Tenant/company is resolved server-side from the user record.
- */
+// Single login form: id + password only.
+// Tenant/company is resolved server-side from the user record.
 export const loginSchema = z
   .object({
     body: z.object({
@@ -42,7 +40,7 @@ export const changePasswordSchema = z.object({
   params: z.object({}).optional(),
 })
 
-/** Self-service profile: name + login ID only (maps to users.email). */
+// Self-service profile: name + login ID only (maps to users.email).
 export const updateProfileSchema = z
   .object({
     body: z.object({

@@ -1,9 +1,8 @@
 import { query } from '../../config/db.js'
 
-/**
- * Resolve login by User ID (email) only — tenant comes from the matched user row.
- * Returns all active matches (normally 0 or 1; >1 if same email exists in multiple tenants).
- */
+ // Resolve login by User ID (email) only — tenant comes from the matched user row.
+ // Returns all active matches (normally 0 or 1; >1 if same email exists in multiple tenants).
+
 export async function findAuthUsersByLoginId(loginId) {
   const { rows } = await query(
     `
@@ -67,7 +66,7 @@ export async function updatePasswordHash(userId, tenantId, passwordHash) {
   )
 }
 
-/** Update display name and/or login ID (email column). */
+// Update display name and/or login ID (email column).
 export async function updateAuthProfile(userId, tenantId, { fullName, email }) {
   if (email) {
     const { rows: clashes } = await query(

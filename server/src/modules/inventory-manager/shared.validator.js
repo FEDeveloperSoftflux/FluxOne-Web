@@ -4,7 +4,7 @@ import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../utils/pagi
 
 export const empty = z.object({}).optional()
 
-/** Treat "" as omitted so optional UUID fields don't 422 with Invalid uuid. */
+// Treat "" as omitted so optional UUID fields don't 422 with Invalid uuid.
 export const optionalUuid = z.preprocess(
   (value) => (value === '' || value === null ? undefined : value),
   z.string().uuid().optional(),
@@ -15,7 +15,7 @@ export const paginationQuery = z.object({
   limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
 })
 
-/** active | inactive | all — default active for clean lists */
+// active | inactive | all — default active for clean lists
 export const activeFilter = z
   .enum(['active', 'inactive', 'all'])
   .optional()
@@ -49,12 +49,12 @@ export const optionalBool = z.preprocess((value) => {
   return value
 }, z.boolean().optional())
 
-/** Accepts UUID-shaped ids (including demo seed ids that are not RFC variant-strict). */
+// Accepts UUID-shaped ids (including demo seed ids that are not RFC variant-strict).
 export const looseUuid = z.string().regex(
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
 )
 
-/** Empty / null → omitted so optional FK fields do not 422. */
+// Empty / null → omitted so optional FK fields do not 422.
 export const optionalLooseUuid = z.preprocess(
   (value) => (value === '' || value === null || value === undefined ? undefined : value),
   looseUuid.optional(),

@@ -45,7 +45,7 @@ export const listStockIn = listByType(MOVEMENT_TYPES.IN)
 export const listAdjustments = listByType(MOVEMENT_TYPES.ADJUSTMENT)
 export const listDamaged = listByType(MOVEMENT_TYPES.DAMAGED)
 
-/** Stock-out history: sales + damaged + expired (no manual create). */
+// Stock-out history: sales + damaged + expired (no manual create).
 export async function listStockOut(req, res) {
   const result = await listLedger(req.tenantId, {
     ...req.validated.query,
@@ -54,7 +54,7 @@ export async function listStockOut(req, res) {
   return success(res, paginatedResult(result.items, result))
 }
 
-/** Process past-due stock-in lots, then list expired history. */
+// Process past-due stock-in lots, then list expired history.
 export async function listExpired(req, res) {
   try {
     await processDueExpirations(req.tenantId, req.user?.id || null)

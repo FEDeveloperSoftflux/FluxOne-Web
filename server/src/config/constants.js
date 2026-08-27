@@ -22,9 +22,7 @@ export const PRODUCT_TYPES = {
 export const PRODUCT_STATUS = {
   ACTIVE: 'active',
   INACTIVE: 'inactive',
-  /** @deprecated use ACTIVE */
   OPEN: 'active',
-  /** @deprecated use INACTIVE */
   CLOSE: 'inactive',
 }
 
@@ -66,9 +64,7 @@ export const POINT_SYSTEMS = {
 export const STAFF_STATUS = {
   ACTIVE: 'active',
   INACTIVE: 'inactive',
-  /** @deprecated use ACTIVE */
   OPEN: 'active',
-  /** @deprecated use INACTIVE */
   BLOCKED: 'inactive',
 }
 
@@ -83,7 +79,6 @@ export const PERMISSIONS = {
   'staff:read': [ROLES.BRANCH_MANAGER, ROLES.B2B_ADMIN],
   'staff:write': [ROLES.BRANCH_MANAGER, ROLES.B2B_ADMIN],
   'designations:read': [ROLES.BRANCH_MANAGER, ROLES.B2B_ADMIN],
-  /** Only B2B Admin maintains designation master (Inventory Manager / Cashier). */
   'designations:write': [ROLES.B2B_ADMIN],
   'attendance:write': [ROLES.BRANCH_MANAGER, ROLES.B2B_ADMIN],
   'performance:read': [ROLES.BRANCH_MANAGER, ROLES.B2B_ADMIN],

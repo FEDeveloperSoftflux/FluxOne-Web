@@ -1,6 +1,6 @@
 import { error } from '../utils/response.util.js'
 
-/** Drop body/query/params prefix so UI shows e.g. `categoryId: Invalid uuid`. */
+// Drop body/query/params prefix so UI shows e.g. `categoryId: Invalid uuid`.
 function formatIssue(issue) {
   if (!issue) return 'Validation failed'
   const path = Array.isArray(issue.path)

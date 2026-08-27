@@ -1,11 +1,9 @@
 import { tenantClientQuery, tenantQuery, withTransaction } from '../../../config/db.js'
 import { MOVEMENT_TYPES } from '../../../config/constants.js'
 
-/**
- * products.quantity = company-wide on-hand.
- * branch_inventory = per-branch allocation (subset of total).
- * Stock-in with branchId bumps both; transfers only move between branches.
- */
+// products.quantity = company-wide on-hand.
+// branch_inventory = per-branch allocation (subset of total).
+// Stock-in with branchId bumps both; transfers only move between branches.
 function onHandDelta(movementType, quantity) {
   const amount = Number(quantity)
   if (movementType === MOVEMENT_TYPES.IN) return amount
@@ -625,10 +623,8 @@ export async function deleteLedgerEvent(tenantId, id, expectedMovementType = nul
   })
 }
 
-/**
- * Convert past-due stock-in lots into expired movements (dynamic expiry).
- * Caps qty by current on-hand so prior sales don't fail the batch.
- */
+// Convert past-due stock-in lots into expired movements (dynamic expiry).
+// Caps qty by current on-hand so prior sales don't fail the batch.
 export async function processDueExpirations(tenantId, createdBy = null) {
   return withTransaction(async (client) => {
     const { rows: due } = await tenantClientQuery(
