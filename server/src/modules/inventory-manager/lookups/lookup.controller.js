@@ -1,17 +1,42 @@
 import { listBranchesForLookup, listEmployeesForLookup, listBranchInventory } from './lookup.model.js'
-import { success } from '../../../utils/response.util.js'
+import { resolveInventoryScope } from '../shared.access.js'
+import { fail, success } from '../../../utils/response.util.js'
 import { paginatedResult } from '../../../utils/pagination.util.js'
 
+function scopeError(res, err) {
+  if (err?.status) return fail(res, err.message, err.status)
+  throw err
+}
+
 export async function employees(req, res) {
-  const result = await listEmployeesForLookup(req.tenantId, req.validated.query)
-  return success(res, paginatedResult(result.items, result))
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const result = await listEmployeesForLookup(tenantId, { ...req.validated.query, branchId })
+    return success(res, paginatedResult(result.items, result))
+  } catch (err) {
+    return scopeError(res, err)
+  }
 }
 
 export async function branches(req, res) {
-  return success(res, await listBranchesForLookup(req.tenantId))
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    return success(res, await listBranchesForLookup(tenantId, { branchId }))
+  } catch (err) {
+    return scopeError(res, err)
+  }
 }
 
 export async function branchInventory(req, res) {
-  const result = await listBranchInventory(req.tenantId, req.validated.query)
-  return success(res, paginatedResult(result.items, result))
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const result = await listBranchInventory(tenantId, {
+      ...req.validated.query,
+      // Branch scope: IM JWT wins over query branchId
+      branchId: branchId || req.validated.query?.branchId || null,
+    })
+    return success(res, paginatedResult(result.items, result))
+  } catch (err) {
+    return scopeError(res, err)
+  }
 }

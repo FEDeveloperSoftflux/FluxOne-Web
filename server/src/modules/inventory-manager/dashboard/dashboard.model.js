@@ -1,19 +1,20 @@
 import { tenantQuery } from '../../../config/db.js'
 
-export async function getOverviewKpis(tenantId) {
+export async function getOverviewKpis(tenantId, { branchId = null } = {}) {
   const { rows } = await tenantQuery(
     tenantId,
     `
       SELECT
-        (SELECT count(*)::int FROM categories WHERE tenant_id = $1 AND parent_id IS NULL) AS "totalCategories",
-        (SELECT count(*)::int FROM categories WHERE tenant_id = $1 AND parent_id IS NOT NULL) AS "totalSubCategories",
-        (SELECT count(*)::int FROM products WHERE tenant_id = $1) AS "totalItems"
+        (SELECT count(*)::int FROM categories WHERE tenant_id = $1 AND parent_id IS NULL AND ($2::uuid IS NULL OR branch_id = $2)) AS "totalCategories",
+        (SELECT count(*)::int FROM categories WHERE tenant_id = $1 AND parent_id IS NOT NULL AND ($2::uuid IS NULL OR branch_id = $2)) AS "totalSubCategories",
+        (SELECT count(*)::int FROM products WHERE tenant_id = $1 AND ($2::uuid IS NULL OR branch_id = $2)) AS "totalItems"
     `,
+    [branchId || null],
   )
   return rows[0]
 }
 
-export async function listStockAlerts(tenantId, { page = 1, limit = 8 } = {}) {
+export async function listStockAlerts(tenantId, { page = 1, limit = 8, branchId = null } = {}) {
   const safePage = Math.max(1, Number(page) || 1)
   const safeLimit = Math.min(50, Math.max(1, Number(limit) || 8))
   const offset = (safePage - 1) * safeLimit
@@ -41,6 +42,7 @@ export async function listStockAlerts(tenantId, { page = 1, limit = 8 } = {}) {
           'system'::text AS source
         FROM products p
         WHERE p.tenant_id = $1
+          AND ($2::uuid IS NULL OR p.branch_id = $2)
 
         UNION ALL
 
@@ -57,11 +59,13 @@ export async function listStockAlerts(tenantId, { page = 1, limit = 8 } = {}) {
         FROM stock_requests sr
         JOIN products p ON p.id = sr.product_id AND p.tenant_id = sr.tenant_id
         WHERE sr.tenant_id = $1 AND sr.status = 'open'
+          AND ($2::uuid IS NULL OR p.branch_id = $2)
+          AND ($2::uuid IS NULL OR sr.branch_id IS NULL OR sr.branch_id = $2)
       ) alerts
       ORDER BY "remainingNumber" ASC
-      LIMIT $2 OFFSET $3
+      LIMIT $3 OFFSET $4
     `,
-    [safeLimit, offset],
+    [branchId || null, safeLimit, offset],
   )
 
   const total = rows[0]?._total || 0
@@ -69,7 +73,7 @@ export async function listStockAlerts(tenantId, { page = 1, limit = 8 } = {}) {
   return { items, total, page: safePage, limit: safeLimit }
 }
 
-export async function listStockOutGraph(tenantId, { from, to } = {}) {
+export async function listStockOutGraph(tenantId, { from, to, branchId = null } = {}) {
   const { rows } = await tenantQuery(
     tenantId,
     `
@@ -77,10 +81,12 @@ export async function listStockOutGraph(tenantId, { from, to } = {}) {
         SELECT
           l.product_id
         FROM inventory_ledger l
+        JOIN products p ON p.id = l.product_id AND p.tenant_id = l.tenant_id
         WHERE l.tenant_id = $1
           AND l.movement_type IN ('out', 'damaged', 'expired')
           AND ($2::date IS NULL OR l.created_at::date >= $2::date)
           AND ($3::date IS NULL OR l.created_at::date <= $3::date)
+          AND ($4::uuid IS NULL OR p.branch_id = $4)
         GROUP BY l.product_id
         ORDER BY sum(ABS(l.quantity)) DESC
         LIMIT 10
@@ -96,10 +102,11 @@ export async function listStockOutGraph(tenantId, { from, to } = {}) {
         AND l.movement_type IN ('out', 'damaged', 'expired')
         AND ($2::date IS NULL OR l.created_at::date >= $2::date)
         AND ($3::date IS NULL OR l.created_at::date <= $3::date)
+        AND ($4::uuid IS NULL OR p.branch_id = $4)
       GROUP BY p.name, day
       ORDER BY day ASC
     `,
-    [from || null, to || null],
+    [from || null, to || null, branchId || null],
   )
   return rows
 }

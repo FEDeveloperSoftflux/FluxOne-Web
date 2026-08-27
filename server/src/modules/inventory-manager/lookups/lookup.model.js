@@ -1,6 +1,9 @@
 import { tenantQuery } from '../../../config/db.js'
 
-export async function listEmployeesForLookup(tenantId, { q, page = 1, limit = 8 } = {}) {
+export async function listEmployeesForLookup(
+  tenantId,
+  { q, page = 1, limit = 8, branchId = null } = {},
+) {
   const safePage = Math.max(1, Number(page) || 1)
   const safeLimit = Math.min(50, Math.max(1, Number(limit) || 8))
   const offset = (safePage - 1) * safeLimit
@@ -19,8 +22,9 @@ export async function listEmployeesForLookup(tenantId, { q, page = 1, limit = 8 
           OR u.email ILIKE '%' || $2 || '%'
           OR s.id::text ILIKE '%' || $2 || '%'
         )
+        AND ($3::uuid IS NULL OR s.branch_id = $3)
     `,
-    [q || null],
+    [q || null, branchId || null],
   )
 
   const { rows } = await tenantQuery(
@@ -43,23 +47,26 @@ export async function listEmployeesForLookup(tenantId, { q, page = 1, limit = 8 
           OR u.email ILIKE '%' || $2 || '%'
           OR s.id::text ILIKE '%' || $2 || '%'
         )
+        AND ($3::uuid IS NULL OR s.branch_id = $3)
       ORDER BY u.full_name
-      LIMIT $3 OFFSET $4
+      LIMIT $4 OFFSET $5
     `,
-    [q || null, safeLimit, offset],
+    [q || null, branchId || null, safeLimit, offset],
   )
   return { items: rows, total: countRows[0]?.total || 0, page: safePage, limit: safeLimit }
 }
 
-export async function listBranchesForLookup(tenantId) {
+export async function listBranchesForLookup(tenantId, { branchId = null } = {}) {
   const { rows } = await tenantQuery(
     tenantId,
     `
       SELECT id, name, created_at AS "createdAt"
       FROM branches
       WHERE tenant_id = $1
+        AND ($2::uuid IS NULL OR id = $2)
       ORDER BY name
     `,
+    [branchId || null],
   )
   return rows
 }

@@ -7,7 +7,13 @@ function httpError(status, message) {
   return error
 }
 
-export async function listCategories(tenantId, { active = 'active' } = {}) {
+// Branch scope: null = all branches (B2B admin)
+function branchClause(alias, paramIndex) {
+  const col = alias ? `${alias}.branch_id` : 'branch_id'
+  return `AND ($${paramIndex}::uuid IS NULL OR ${col} = $${paramIndex})`
+}
+
+export async function listCategories(tenantId, { active = 'active', branchId = null } = {}) {
   const activeClause =
     active === 'all'
       ? ''
@@ -18,17 +24,22 @@ export async function listCategories(tenantId, { active = 'active' } = {}) {
   const { rows } = await tenantQuery(
     tenantId,
     `
-      SELECT id, parent_id AS "parentId", name, image_url AS "imageUrl", is_active AS "isActive"
+      SELECT id, parent_id AS "parentId", name, image_url AS "imageUrl", is_active AS "isActive",
+        branch_id AS "branchId"
       FROM categories
       WHERE tenant_id = $1
+        ${branchClause('', 2)}
         ${activeClause}
       ORDER BY name
     `,
+    [branchId],
   )
   return rows
 }
 
-export async function createCategory(tenantId, { name, parentId, imageUrl }) {
+export async function createCategory(tenantId, { name, parentId, imageUrl, branchId }) {
+  if (!branchId) throw httpError(422, 'branchId is required to create a category')
+
   if (parentId) {
     const { rows: parents } = await tenantQuery(
       tenantId,
@@ -36,9 +47,10 @@ export async function createCategory(tenantId, { name, parentId, imageUrl }) {
         SELECT id, is_active AS "isActive"
         FROM categories
         WHERE tenant_id = $1 AND id = $2 AND parent_id IS NULL
+          AND branch_id = $3
         LIMIT 1
       `,
-      [parentId],
+      [parentId, branchId],
     )
     if (!parents[0]) throw httpError(404, 'Parent category not found')
     if (!parents[0].isActive) throw httpError(409, 'Cannot add subcategory under an inactive category')
@@ -47,22 +59,23 @@ export async function createCategory(tenantId, { name, parentId, imageUrl }) {
   const { rows } = await tenantQuery(
     tenantId,
     `
-      INSERT INTO categories (tenant_id, parent_id, name, image_url, is_active)
-      VALUES ($1, $2, $3, $4, true)
-      RETURNING id, parent_id AS "parentId", name, image_url AS "imageUrl", is_active AS "isActive"
+      INSERT INTO categories (tenant_id, branch_id, parent_id, name, image_url, is_active)
+      VALUES ($1, $2, $3, $4, $5, true)
+      RETURNING id, parent_id AS "parentId", name, image_url AS "imageUrl", is_active AS "isActive",
+        branch_id AS "branchId"
     `,
-    [parentId || null, name, imageUrl || null],
+    [branchId, parentId || null, name, imageUrl || null],
   )
   return rows[0]
 }
 
-export async function updateCategory(tenantId, id, { name, imageUrl, isActive }) {
+export async function updateCategory(tenantId, id, { name, imageUrl, isActive, branchId = null }) {
   if (isActive !== undefined) {
-    return setCategoryActive(tenantId, id, isActive)
+    return setCategoryActive(tenantId, id, isActive, { branchId })
   }
 
   const setClauses = []
-  const params = [id]
+  const params = [id, branchId]
 
   if (name !== undefined) {
     setClauses.push(`name = $${params.length + 2}`)
@@ -77,12 +90,14 @@ export async function updateCategory(tenantId, id, { name, imageUrl, isActive })
     const { rows } = await tenantQuery(
       tenantId,
       `
-        SELECT id, parent_id AS "parentId", name, image_url AS "imageUrl", is_active AS "isActive"
+        SELECT id, parent_id AS "parentId", name, image_url AS "imageUrl", is_active AS "isActive",
+          branch_id AS "branchId"
         FROM categories
         WHERE tenant_id = $1 AND id = $2
+          ${branchClause('', 3)}
         LIMIT 1
       `,
-      [id],
+      [id, branchId],
     )
     return rows[0] || null
   }
@@ -93,7 +108,9 @@ export async function updateCategory(tenantId, id, { name, imageUrl, isActive })
       UPDATE categories
       SET ${setClauses.join(', ')}
       WHERE tenant_id = $1 AND id = $2
-      RETURNING id, parent_id AS "parentId", name, image_url AS "imageUrl", is_active AS "isActive"
+        ${branchClause('', 3)}
+      RETURNING id, parent_id AS "parentId", name, image_url AS "imageUrl", is_active AS "isActive",
+        branch_id AS "branchId"
     `,
     params,
   )
@@ -106,18 +123,19 @@ export async function updateCategory(tenantId, id, { name, imageUrl, isActive })
  * - Subcategory inactive → clear product subcategory_id only
  * Products stay active; category shows as N/A.
  */
-export async function setCategoryActive(tenantId, id, isActive) {
+export async function setCategoryActive(tenantId, id, isActive, { branchId = null } = {}) {
   return withTransaction(async (client) => {
     const { rows: existing } = await tenantClientQuery(
       client,
       tenantId,
       `
-        SELECT id, parent_id AS "parentId", is_active AS "isActive"
+        SELECT id, parent_id AS "parentId", is_active AS "isActive", branch_id AS "branchId"
         FROM categories
         WHERE tenant_id = $1 AND id = $2
+          ${branchClause('', 3)}
         LIMIT 1
       `,
-      [id],
+      [id, branchId],
     )
     const row = existing[0]
     if (!row) return null
@@ -188,7 +206,8 @@ export async function setCategoryActive(tenantId, id, isActive) {
       client,
       tenantId,
       `
-        SELECT id, parent_id AS "parentId", name, image_url AS "imageUrl", is_active AS "isActive"
+        SELECT id, parent_id AS "parentId", name, image_url AS "imageUrl", is_active AS "isActive",
+          branch_id AS "branchId"
         FROM categories
         WHERE tenant_id = $1 AND id = $2
         LIMIT 1
@@ -200,21 +219,24 @@ export async function setCategoryActive(tenantId, id, isActive) {
 }
 
 /** @deprecated Prefer setCategoryActive — hard delete kept for empty unused categories only */
-export async function deleteCategory(tenantId, id) {
-  return setCategoryActive(tenantId, id, false)
+export async function deleteCategory(tenantId, id, { branchId = null } = {}) {
+  return setCategoryActive(tenantId, id, false, { branchId })
 }
 
-export async function findOrCreateImportedCategory(tenantId) {
+export async function findOrCreateImportedCategory(tenantId, branchId) {
+  if (!branchId) throw httpError(422, 'branchId is required to import products')
+
   const { rows: existing } = await tenantQuery(
     tenantId,
     `
       SELECT id FROM categories
-      WHERE tenant_id = $1 AND name = 'Imported' AND parent_id IS NULL
+      WHERE tenant_id = $1 AND branch_id = $2 AND name = 'Imported' AND parent_id IS NULL
       LIMIT 1
     `,
+    [branchId],
   )
   if (existing[0]) return existing[0]
-  return createCategory(tenantId, { name: 'Imported' })
+  return createCategory(tenantId, { name: 'Imported', branchId })
 }
 
 export async function listTaxes(tenantId) {
@@ -248,6 +270,7 @@ export async function listProducts(tenantId, filters = {}) {
     filters.type || null,
     filters.scale || null,
     statusFilter,
+    filters.branchId || null,
   ]
 
   // Single round-trip: page rows + total via window count (same response shape).
@@ -267,6 +290,7 @@ export async function listProducts(tenantId, filters = {}) {
         p.description,
         p.category_id AS "categoryId",
         p.subcategory_id AS "subcategoryId",
+        p.branch_id AS "branchId",
         p.purchase_price AS "purchasePrice",
         p.selling_price AS "sellingPrice",
         p.discount_percent AS "discountPercent",
@@ -308,8 +332,9 @@ export async function listProducts(tenantId, filters = {}) {
         AND ($5::text IS NULL OR p.type = $5)
         AND ($6::text IS NULL OR p.scale = $6)
         AND ($7::text IS NULL OR p.status = $7)
+        ${branchClause('p', 8)}
       ORDER BY p.created_at DESC
-      LIMIT $8 OFFSET $9
+      LIMIT $9 OFFSET $10
     `,
     [...filterParams, limit, offset],
   )
@@ -319,25 +344,37 @@ export async function listProducts(tenantId, filters = {}) {
   return { items, total, page, limit }
 }
 
-export async function findProductByBarcode(tenantId, barcode) {
+export async function findProductByBarcode(tenantId, barcode, { branchId = null } = {}) {
   const { rows } = await tenantQuery(
     tenantId,
-    `SELECT id, name, barcode, item_code AS "itemCode" FROM products WHERE tenant_id = $1 AND barcode = $2 LIMIT 1`,
-    [barcode],
+    `
+      SELECT id, name, barcode, item_code AS "itemCode", branch_id AS "branchId"
+      FROM products
+      WHERE tenant_id = $1 AND barcode = $2
+        ${branchClause('', 3)}
+      LIMIT 1
+    `,
+    [barcode, branchId],
   )
   return rows[0] || null
 }
 
-export async function getProductById(tenantId, id) {
+export async function getProductById(tenantId, id, { branchId = null } = {}) {
   const { rows } = await tenantQuery(
     tenantId,
-    `SELECT id, name, barcode, item_code AS "itemCode" FROM products WHERE tenant_id = $1 AND id = $2 LIMIT 1`,
-    [id],
+    `
+      SELECT id, name, barcode, item_code AS "itemCode", branch_id AS "branchId"
+      FROM products
+      WHERE tenant_id = $1 AND id = $2
+        ${branchClause('', 3)}
+      LIMIT 1
+    `,
+    [id, branchId],
   )
   return rows[0] || null
 }
 
-export async function getProductDetail(tenantId, id) {
+export async function getProductDetail(tenantId, id, { branchId = null } = {}) {
   const { rows } = await tenantQuery(
     tenantId,
     `
@@ -354,6 +391,7 @@ export async function getProductDetail(tenantId, id) {
         p.description,
         p.category_id AS "categoryId",
         p.subcategory_id AS "subcategoryId",
+        p.branch_id AS "branchId",
         p.purchase_price AS "purchasePrice",
         p.selling_price AS "sellingPrice",
         p.discount_percent AS "discountPercent",
@@ -390,9 +428,10 @@ export async function getProductDetail(tenantId, id) {
         WHERE pt.tenant_id = p.tenant_id AND pt.product_id = p.id
       ) tax ON true
       WHERE p.tenant_id = $1 AND p.id = $2
+        ${branchClause('p', 3)}
       LIMIT 1
     `,
-    [id],
+    [id, branchId],
   )
   const product = rows[0]
   if (!product) return null
@@ -447,7 +486,7 @@ async function attachTaxes(client, tenantId, productId, taxIds = []) {
   )
 }
 
-async function attachBundleItems(client, tenantId, bundleId, bundleItems = []) {
+async function attachBundleItems(client, tenantId, bundleId, bundleItems = [], branchId = null) {
   await tenantClientQuery(
     client,
     tenantId,
@@ -464,11 +503,15 @@ async function attachBundleItems(client, tenantId, bundleId, bundleItems = []) {
   const { rows } = await tenantClientQuery(
     client,
     tenantId,
-    `SELECT id FROM products WHERE tenant_id = $1 AND id = ANY($2::uuid[])`,
-    [ids],
+    `
+      SELECT id FROM products
+      WHERE tenant_id = $1 AND id = ANY($2::uuid[])
+        ${branchClause('', 3)}
+    `,
+    [ids, branchId],
   )
   if (rows.length !== new Set(ids).size) {
-    throw httpError(422, 'One or more bundle items do not belong to this tenant')
+    throw httpError(422, 'One or more bundle items do not belong to this branch')
   }
 
   await tenantClientQuery(
@@ -484,6 +527,8 @@ async function attachBundleItems(client, tenantId, bundleId, bundleItems = []) {
 }
 
 export async function createProduct(tenantId, payload) {
+  if (!payload.branchId) throw httpError(422, 'branchId is required to create a product')
+
   return withTransaction(async (client) => {
     if (payload.categoryId) {
       const { rows: cats } = await tenantClientQuery(
@@ -492,10 +537,10 @@ export async function createProduct(tenantId, payload) {
         `
           SELECT id, is_active AS "isActive", parent_id AS "parentId"
           FROM categories
-          WHERE tenant_id = $1 AND id = $2
+          WHERE tenant_id = $1 AND id = $2 AND branch_id = $3
           LIMIT 1
         `,
-        [payload.categoryId],
+        [payload.categoryId, payload.branchId],
       )
       if (!cats[0]) throw httpError(404, 'Category not found')
       if (!cats[0].isActive) throw httpError(409, 'Cannot assign an inactive category')
@@ -508,10 +553,10 @@ export async function createProduct(tenantId, payload) {
         `
           SELECT id, is_active AS "isActive", parent_id AS "parentId"
           FROM categories
-          WHERE tenant_id = $1 AND id = $2
+          WHERE tenant_id = $1 AND id = $2 AND branch_id = $3
           LIMIT 1
         `,
-        [payload.subcategoryId],
+        [payload.subcategoryId, payload.branchId],
       )
       if (!subs[0]) throw httpError(404, 'Subcategory not found')
       if (!subs[0].isActive) throw httpError(409, 'Cannot assign an inactive subcategory')
@@ -522,13 +567,14 @@ export async function createProduct(tenantId, payload) {
       tenantId,
       `
         INSERT INTO products (
-          tenant_id, category_id, subcategory_id, type, item_code, name, image_url,
+          tenant_id, branch_id, category_id, subcategory_id, type, item_code, name, image_url,
           scale, barcode, description, purchase_price, selling_price, offer_id, discount_percent, quantity, status
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'active')
-        RETURNING id, name, item_code AS "itemCode", barcode, type, status
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'active')
+        RETURNING id, name, item_code AS "itemCode", barcode, type, status, branch_id AS "branchId"
       `,
       [
+        payload.branchId,
         payload.categoryId,
         payload.subcategoryId || null,
         payload.type,
@@ -548,7 +594,7 @@ export async function createProduct(tenantId, payload) {
     const product = rows[0]
     await attachTaxes(client, tenantId, product.id, payload.taxIds || [])
     if (payload.type === PRODUCT_TYPES.BUNDLE) {
-      await attachBundleItems(client, tenantId, product.id, payload.bundleItems || [])
+      await attachBundleItems(client, tenantId, product.id, payload.bundleItems || [], payload.branchId)
     }
     return product
   })
@@ -569,12 +615,12 @@ const UPDATABLE_COLUMNS = {
   imageUrl: 'image_url',
 }
 
-export async function updateProduct(tenantId, id, payload) {
+export async function updateProduct(tenantId, id, payload, { branchId = null } = {}) {
   return withTransaction(async (client) => {
     // Collect only the keys the caller explicitly sent so we never COALESCE away
     // a deliberate NULL (e.g. removing a discount or unlinking an offer).
     const setClauses = []
-    const params = [id] // $2 = id; $1 is tenantId injected by tenantClientQuery
+    const params = [id, branchId] // $2 = id; $3 = branchId; $1 is tenantId injected by tenantClientQuery
 
     for (const [payloadKey, column] of Object.entries(UPDATABLE_COLUMNS)) {
       if (!(payloadKey in payload)) continue // key not sent → leave column alone
@@ -611,8 +657,13 @@ export async function updateProduct(tenantId, id, payload) {
       const { rows: current } = await tenantClientQuery(
         client,
         tenantId,
-        `SELECT id, name, status FROM products WHERE tenant_id = $1 AND id = $2`,
-        [id],
+        `
+          SELECT id, name, status, branch_id AS "branchId"
+          FROM products
+          WHERE tenant_id = $1 AND id = $2
+            ${branchClause('', 3)}
+        `,
+        [id, branchId],
       )
       return current[0] || null
     }
@@ -623,7 +674,12 @@ export async function updateProduct(tenantId, id, payload) {
       const { rows } = await tenantClientQuery(
         client,
         tenantId,
-        `UPDATE products SET ${setClauses.join(', ')} WHERE tenant_id = $1 AND id = $2 RETURNING id, name, status`,
+        `
+          UPDATE products SET ${setClauses.join(', ')}
+          WHERE tenant_id = $1 AND id = $2
+            ${branchClause('', 3)}
+          RETURNING id, name, status, branch_id AS "branchId"
+        `,
         params,
       )
       product = rows[0] || null
@@ -632,29 +688,37 @@ export async function updateProduct(tenantId, id, payload) {
       const { rows } = await tenantClientQuery(
         client,
         tenantId,
-        `SELECT id, name, status FROM products WHERE tenant_id = $1 AND id = $2`,
-        [id],
+        `
+          SELECT id, name, status, branch_id AS "branchId"
+          FROM products
+          WHERE tenant_id = $1 AND id = $2
+            ${branchClause('', 3)}
+        `,
+        [id, branchId],
       )
       product = rows[0] || null
       if (!product) return null
     }
 
     if (payload.taxIds !== undefined) await attachTaxes(client, tenantId, id, payload.taxIds)
-    if (payload.bundleItems !== undefined) await attachBundleItems(client, tenantId, id, payload.bundleItems)
+    if (payload.bundleItems !== undefined) {
+      await attachBundleItems(client, tenantId, id, payload.bundleItems, product.branchId || branchId)
+    }
     return product
   })
 }
 
-export async function deleteProduct(tenantId, id) {
+export async function deleteProduct(tenantId, id, { branchId = null } = {}) {
   const { rows } = await tenantQuery(
     tenantId,
     `
       UPDATE products
       SET status = 'inactive'
       WHERE tenant_id = $1 AND id = $2
+        ${branchClause('', 3)}
       RETURNING id
     `,
-    [id],
+    [id, branchId],
   )
   return Boolean(rows[0])
 }

@@ -187,6 +187,7 @@ export async function listTransfers(tenantId, filters = {}) {
     filters.subcategoryId || null,
     filters.scale || null,
     filters.type || null,
+    filters.branchId || null,
   ]
 
   const { rows: countRows } = await tenantQuery(
@@ -202,6 +203,7 @@ export async function listTransfers(tenantId, filters = {}) {
         AND ($4::uuid IS NULL OR p.subcategory_id = $4)
         AND ($5::text IS NULL OR p.scale = $5)
         AND ($6::text IS NULL OR p.type = $6)
+        AND ($7::uuid IS NULL OR p.branch_id = $7)
     `,
     filterParams,
   )
@@ -232,8 +234,9 @@ export async function listTransfers(tenantId, filters = {}) {
         AND ($4::uuid IS NULL OR p.subcategory_id = $4)
         AND ($5::text IS NULL OR p.scale = $5)
         AND ($6::text IS NULL OR p.type = $6)
+        AND ($7::uuid IS NULL OR p.branch_id = $7)
       ORDER BY l.created_at DESC
-      LIMIT $7 OFFSET $8
+      LIMIT $8 OFFSET $9
     `,
     [...filterParams, limit, offset],
   )
@@ -249,15 +252,25 @@ export async function createStockTransfer(tenantId, event) {
     await assertBranchExists(client, tenantId, event.fromBranchId)
     await assertBranchExists(client, tenantId, event.toBranchId)
 
+    // Branch scope: product must belong to scoped branch when set
     const { rows: products } = await tenantClientQuery(
       client,
       tenantId,
-      `SELECT id, status FROM products WHERE tenant_id = $1 AND id = $2 LIMIT 1`,
-      [event.productId],
+      `
+        SELECT id, status, branch_id AS "branchId"
+        FROM products
+        WHERE tenant_id = $1 AND id = $2
+          AND ($3::uuid IS NULL OR branch_id = $3)
+        LIMIT 1
+      `,
+      [event.productId, event.scopeBranchId || null],
     )
     if (!products[0]) throw httpError(404, 'Product not found')
     if (products[0].status === 'inactive') {
       throw httpError(409, 'Product is inactive and cannot be transferred')
+    }
+    if (event.scopeBranchId && event.fromBranchId !== event.scopeBranchId) {
+      throw httpError(403, 'Transfers must originate from your assigned branch')
     }
 
     await adjustBranchInventory(
@@ -300,6 +313,7 @@ export async function listLedger(tenantId, filters = {}) {
     filters.subcategoryId || null,
     filters.scale || null,
     filters.type || null,
+    filters.branchId || null,
   ]
 
   const { rows: countRows } = await tenantQuery(
@@ -315,6 +329,7 @@ export async function listLedger(tenantId, filters = {}) {
         AND ($5::uuid IS NULL OR p.subcategory_id = $5)
         AND ($6::text IS NULL OR p.scale = $6)
         AND ($7::text IS NULL OR p.type = $7)
+        AND ($8::uuid IS NULL OR p.branch_id = $8)
     `,
     filterParams,
   )
@@ -354,37 +369,71 @@ export async function listLedger(tenantId, filters = {}) {
         AND ($5::uuid IS NULL OR p.subcategory_id = $5)
         AND ($6::text IS NULL OR p.scale = $6)
         AND ($7::text IS NULL OR p.type = $7)
+        AND ($8::uuid IS NULL OR p.branch_id = $8)
       ORDER BY l.created_at DESC
-      LIMIT $8 OFFSET $9
+      LIMIT $9 OFFSET $10
     `,
     [...filterParams, limit, offset],
   )
   return { items: rows, total: countRows[0]?.total || 0, page, limit }
 }
 
-export async function getLedgerById(tenantId, id, client = null) {
+export async function getLedgerById(tenantId, id, client = null, { branchId = null } = {}) {
   const run = client
     ? (text, params) => tenantClientQuery(client, tenantId, text, params)
     : (text, params) => tenantQuery(tenantId, text, params)
   const { rows } = await run(
     `
       SELECT
-        id,
-        product_id AS "productId",
-        movement_type AS "movementType",
-        quantity,
-        to_branch_id AS "toBranchId"
-      FROM inventory_ledger
-      WHERE tenant_id = $1 AND id = $2
+        l.id,
+        l.product_id AS "productId",
+        l.movement_type AS "movementType",
+        l.quantity,
+        l.to_branch_id AS "toBranchId"
+      FROM inventory_ledger l
+      JOIN products p ON p.id = l.product_id AND p.tenant_id = l.tenant_id
+      WHERE l.tenant_id = $1 AND l.id = $2
+        AND ($3::uuid IS NULL OR p.branch_id = $3)
       LIMIT 1
-      FOR UPDATE
+      FOR UPDATE OF l
     `,
-    [id],
+    [id, branchId || null],
   )
   return rows[0] || null
 }
 
 export async function insertLedgerEventInTx(client, tenantId, event) {
+  // Branch scope: when scoped, product must belong to that branch
+  if (event.scopeBranchId != null) {
+    const { rows: scoped } = await tenantClientQuery(
+      client,
+      tenantId,
+      `
+        SELECT id, branch_id
+        FROM products
+        WHERE tenant_id = $1 AND id = $2
+          AND ($3::uuid IS NULL OR branch_id = $3)
+        LIMIT 1
+      `,
+      [event.productId, event.scopeBranchId],
+    )
+    if (!scoped[0]) throw httpError(404, 'Product not found')
+
+    if (event.supplierId) {
+      const { rows: suppliers } = await tenantClientQuery(
+        client,
+        tenantId,
+        `
+          SELECT id FROM suppliers
+          WHERE tenant_id = $1 AND id = $2 AND branch_id = $3
+          LIMIT 1
+        `,
+        [event.supplierId, event.scopeBranchId],
+      )
+      if (!suppliers[0]) throw httpError(404, 'Supplier not found')
+    }
+  }
+
   await assertProductActive(client, tenantId, event.productId)
   validateQuantityForType(event.movementType, event.quantity)
 
@@ -479,9 +528,15 @@ export async function insertLedgerLines(tenantId, events) {
   })
 }
 
-export async function updateLedgerEvent(tenantId, id, payload, expectedMovementType = null) {
+export async function updateLedgerEvent(
+  tenantId,
+  id,
+  payload,
+  expectedMovementType = null,
+  { branchId = null } = {},
+) {
   return withTransaction(async (client) => {
-    const existing = await getLedgerById(tenantId, id, client)
+    const existing = await getLedgerById(tenantId, id, client, { branchId })
     if (!existing) return null
     if (expectedMovementType && existing.movementType !== expectedMovementType) {
       return null
@@ -587,9 +642,14 @@ export async function updateLedgerEvent(tenantId, id, payload, expectedMovementT
   })
 }
 
-export async function deleteLedgerEvent(tenantId, id, expectedMovementType = null) {
+export async function deleteLedgerEvent(
+  tenantId,
+  id,
+  expectedMovementType = null,
+  { branchId = null } = {},
+) {
   return withTransaction(async (client) => {
-    const existing = await getLedgerById(tenantId, id, client)
+    const existing = await getLedgerById(tenantId, id, client, { branchId })
     if (!existing) return false
     if (expectedMovementType && existing.movementType !== expectedMovementType) {
       return false
@@ -625,28 +685,31 @@ export async function deleteLedgerEvent(tenantId, id, expectedMovementType = nul
 
 // Convert past-due stock-in lots into expired movements (dynamic expiry).
 // Caps qty by current on-hand so prior sales don't fail the batch.
-export async function processDueExpirations(tenantId, createdBy = null) {
+export async function processDueExpirations(tenantId, createdBy = null, { branchId = null } = {}) {
   return withTransaction(async (client) => {
     const { rows: due } = await tenantClientQuery(
       client,
       tenantId,
       `
         SELECT
-          id,
-          product_id AS "productId",
-          quantity,
-          scale,
-          supplier_id AS "supplierId",
-          expires_at AS "expiresAt"
-        FROM inventory_ledger
-        WHERE tenant_id = $1
-          AND movement_type = 'in'
-          AND expires_at IS NOT NULL
-          AND expires_at::date <= CURRENT_DATE
-          AND expiry_processed = FALSE
-        ORDER BY expires_at ASC, created_at ASC
-        FOR UPDATE
+          l.id,
+          l.product_id AS "productId",
+          l.quantity,
+          l.scale,
+          l.supplier_id AS "supplierId",
+          l.expires_at AS "expiresAt"
+        FROM inventory_ledger l
+        JOIN products p ON p.id = l.product_id AND p.tenant_id = l.tenant_id
+        WHERE l.tenant_id = $1
+          AND l.movement_type = 'in'
+          AND l.expires_at IS NOT NULL
+          AND l.expires_at::date <= CURRENT_DATE
+          AND l.expiry_processed = FALSE
+          AND ($2::uuid IS NULL OR p.branch_id = $2)
+        ORDER BY l.expires_at ASC, l.created_at ASC
+        FOR UPDATE OF l
       `,
+      [branchId || null],
     )
 
     let processed = 0

@@ -1,10 +1,12 @@
 import { tenantQuery } from '../../../config/db.js'
 
-function dateParams({ from, to } = {}) {
-  return [from || null, to || null]
+function dateParams({ from, to, branchId } = {}) {
+  return [from || null, to || null, branchId || null]
 }
 
-export async function inventoryReport(tenantId, { from, to } = {}) {
+export async function inventoryReport(tenantId, { from, to, branchId = null } = {}) {
+  const params = dateParams({ from, to, branchId })
+
   const { rows: summaryRows } = await tenantQuery(
     tenantId,
     `
@@ -17,8 +19,9 @@ export async function inventoryReport(tenantId, { from, to } = {}) {
       WHERE p.tenant_id = $1
         AND ($2::date IS NULL OR p.created_at::date >= $2::date)
         AND ($3::date IS NULL OR p.created_at::date <= $3::date)
+        AND ($4::uuid IS NULL OR p.branch_id = $4)
     `,
-    dateParams({ from, to }),
+    params,
   )
 
   const { rows: items } = await tenantQuery(
@@ -43,15 +46,18 @@ export async function inventoryReport(tenantId, { from, to } = {}) {
       WHERE p.tenant_id = $1
         AND ($2::date IS NULL OR p.created_at::date >= $2::date)
         AND ($3::date IS NULL OR p.created_at::date <= $3::date)
+        AND ($4::uuid IS NULL OR p.branch_id = $4)
       ORDER BY p.name
     `,
-    dateParams({ from, to }),
+    params,
   )
 
   return { summary: summaryRows[0], items }
 }
 
-export async function stockMovementReport(tenantId, { from, to } = {}) {
+export async function stockMovementReport(tenantId, { from, to, branchId = null } = {}) {
+  const params = dateParams({ from, to, branchId })
+
   const { rows: summary } = await tenantQuery(
     tenantId,
     `
@@ -69,13 +75,15 @@ export async function stockMovementReport(tenantId, { from, to } = {}) {
           0
         )::numeric AS "totalQuantity"
       FROM inventory_ledger l
+      JOIN products p ON p.id = l.product_id AND p.tenant_id = l.tenant_id
       WHERE l.tenant_id = $1
         AND ($2::date IS NULL OR l.created_at::date >= $2::date)
         AND ($3::date IS NULL OR l.created_at::date <= $3::date)
+        AND ($4::uuid IS NULL OR p.branch_id = $4)
       GROUP BY l.movement_type
       ORDER BY l.movement_type
     `,
-    dateParams({ from, to }),
+    params,
   )
 
   const { rows: movements } = await tenantQuery(
@@ -101,15 +109,18 @@ export async function stockMovementReport(tenantId, { from, to } = {}) {
       WHERE l.tenant_id = $1
         AND ($2::date IS NULL OR l.created_at::date >= $2::date)
         AND ($3::date IS NULL OR l.created_at::date <= $3::date)
+        AND ($4::uuid IS NULL OR p.branch_id = $4)
       ORDER BY l.created_at DESC
     `,
-    dateParams({ from, to }),
+    params,
   )
 
   return { summary, movements }
 }
 
-export async function purchaseReport(tenantId, { from, to } = {}) {
+export async function purchaseReport(tenantId, { from, to, branchId = null } = {}) {
+  const params = dateParams({ from, to, branchId })
+
   const { rows: summaryRows } = await tenantQuery(
     tenantId,
     `
@@ -123,8 +134,9 @@ export async function purchaseReport(tenantId, { from, to } = {}) {
       WHERE po.tenant_id = $1
         AND ($2::date IS NULL OR po.created_at::date >= $2::date)
         AND ($3::date IS NULL OR po.created_at::date <= $3::date)
+        AND ($4::uuid IS NULL OR po.branch_id = $4)
     `,
-    dateParams({ from, to }),
+    params,
   )
 
   const { rows: orders } = await tenantQuery(
@@ -145,16 +157,17 @@ export async function purchaseReport(tenantId, { from, to } = {}) {
       WHERE po.tenant_id = $1
         AND ($2::date IS NULL OR po.created_at::date >= $2::date)
         AND ($3::date IS NULL OR po.created_at::date <= $3::date)
+        AND ($4::uuid IS NULL OR po.branch_id = $4)
       GROUP BY po.id, s.company_name
       ORDER BY po.created_at DESC
     `,
-    dateParams({ from, to }),
+    params,
   )
 
   return { summary: summaryRows[0], orders }
 }
 
-export async function lowStockReport(tenantId) {
+export async function lowStockReport(tenantId, { branchId = null } = {}) {
   const { rows } = await tenantQuery(
     tenantId,
     `
@@ -175,8 +188,10 @@ export async function lowStockReport(tenantId) {
       LEFT JOIN categories c ON c.id = p.category_id AND c.tenant_id = p.tenant_id
       WHERE p.tenant_id = $1
         AND p.quantity <= p.reorder_point
+        AND ($2::uuid IS NULL OR p.branch_id = $2)
       ORDER BY p.quantity ASC, p.name
     `,
+    [branchId || null],
   )
   return { items: rows, count: rows.length }
 }

@@ -8,70 +8,117 @@ import {
   priceHistory,
   sendPurchaseOrderSms,
 } from './purchase_order.model.js'
+import { resolveInventoryCreateScope, resolveInventoryScope } from '../shared.access.js'
 import { fail, success } from '../../../utils/response.util.js'
 import { paginatedResult } from '../../../utils/pagination.util.js'
 
+function scopeError(res, err) {
+  if (err?.status) return fail(res, err.message, err.status)
+  throw err
+}
+
 export async function list(req, res) {
-  const result = await listPurchaseOrders(req.tenantId, req.validated.query)
-  return success(res, paginatedResult(result.items, result))
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const result = await listPurchaseOrders(tenantId, { ...req.validated.query, branchId })
+    return success(res, paginatedResult(result.items, result))
+  } catch (err) {
+    return scopeError(res, err)
+  }
 }
 
 export async function generate(req, res) {
-  const order = await generatePurchaseOrder(req.tenantId, {
-    ...req.validated.body,
-    createdBy: req.user.id,
-  })
+  try {
+    const { tenantId, branchId } = resolveInventoryCreateScope(req)
+    const order = await generatePurchaseOrder(tenantId, {
+      ...req.validated.body,
+      branchId,
+      createdBy: req.user.id,
+    })
 
-  let sms = null
-  if (req.validated.body.sendSms) {
-    try {
-      sms = await sendPurchaseOrderSms(req.tenantId, order.id)
-    } catch (err) {
-      sms = { sent: false, error: err.message || 'Failed to send SMS' }
+    let sms = null
+    if (req.validated.body.sendSms) {
+      try {
+        sms = await sendPurchaseOrderSms(tenantId, order.id, { branchId })
+      } catch (err) {
+        sms = { sent: false, error: err.message || 'Failed to send SMS' }
+      }
     }
-  }
 
-  return success(res, { ...order, sms }, 201)
+    return success(res, { ...order, sms }, 201)
+  } catch (err) {
+    return scopeError(res, err)
+  }
 }
 
 export async function detail(req, res) {
-  const order = await getPurchaseOrderById(req.tenantId, req.validated.params.id)
-  if (!order) return fail(res, 'Purchase order not found', 404)
-  return success(res, order)
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const order = await getPurchaseOrderById(tenantId, req.validated.params.id, { branchId })
+    if (!order) return fail(res, 'Purchase order not found', 404)
+    return success(res, order)
+  } catch (err) {
+    return scopeError(res, err)
+  }
 }
 
 export async function history(req, res) {
-  const data = await priceHistory(req.tenantId, req.validated.params.id)
-  if (!data) return fail(res, 'Purchase order not found', 404)
-  return success(res, data)
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const data = await priceHistory(tenantId, req.validated.params.id, { branchId })
+    if (!data) return fail(res, 'Purchase order not found', 404)
+    return success(res, data)
+  } catch (err) {
+    return scopeError(res, err)
+  }
 }
 
 export async function cancel(req, res) {
-  const order = await cancelPurchaseOrder(req.tenantId, req.validated.params.id)
-  if (!order) return fail(res, 'Purchase order not found', 404)
-  return success(res, order)
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const order = await cancelPurchaseOrder(tenantId, req.validated.params.id, { branchId })
+    if (!order) return fail(res, 'Purchase order not found', 404)
+    return success(res, order)
+  } catch (err) {
+    return scopeError(res, err)
+  }
 }
 
 export async function approve(req, res) {
-  const order = await approvePurchaseOrder(req.tenantId, req.validated.params.id, req.user.id)
-  if (!order) return fail(res, 'Purchase order not found', 404)
-  return success(res, order)
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const order = await approvePurchaseOrder(tenantId, req.validated.params.id, req.user.id, { branchId })
+    if (!order) return fail(res, 'Purchase order not found', 404)
+    return success(res, order)
+  } catch (err) {
+    return scopeError(res, err)
+  }
 }
 
 export async function print(req, res) {
-  const data = await buildPurchaseOrderPrint(req.tenantId, req.validated.params.id)
-  if (!data) return fail(res, 'Purchase order not found', 404)
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const data = await buildPurchaseOrderPrint(tenantId, req.validated.params.id, { branchId })
+    if (!data) return fail(res, 'Purchase order not found', 404)
 
-  if (req.query.format === 'json') {
-    return success(res, data)
+    if (req.query.format === 'json') {
+      return success(res, data)
+    }
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8')
+    return res.send(data.html)
+  } catch (err) {
+    return scopeError(res, err)
   }
-
-  res.setHeader('Content-Type', 'text/html; charset=utf-8')
-  return res.send(data.html)
 }
 
 export async function sendSmsToSupplier(req, res) {
-  const result = await sendPurchaseOrderSms(req.tenantId, req.validated.params.id)
-  if (!result) return fail(res, 'Purchase order not found', 404)
-  return success(res, result)
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const result = await sendPurchaseOrderSms(tenantId, req.validated.params.id, { branchId })
+    if (!result) return fail(res, 'Purchase order not found', 404)
+    return success(res, result)
+  } catch (err) {
+    return scopeError(res, err)
+  }
 }

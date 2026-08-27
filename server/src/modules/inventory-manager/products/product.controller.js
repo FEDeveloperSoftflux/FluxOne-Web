@@ -14,6 +14,7 @@ import {
   updateCategory,
   updateProduct,
 } from './product.model.js'
+import { resolveInventoryCreateScope, resolveInventoryScope } from '../shared.access.js'
 import { PRODUCT_TYPES } from '../../../config/constants.js'
 import { generateBarcodeValue, generateItemCode, renderBarcodePng } from '../../../utils/barcode.util.js'
 import { fail, success } from '../../../utils/response.util.js'
@@ -23,9 +24,19 @@ function uploadedUrl(file) {
   return file?.path || file?.secure_url || null
 }
 
+function scopeError(res, err) {
+  if (err?.status) return fail(res, err.message, err.status)
+  throw err
+}
+
 export async function categories(req, res) {
-  const active = req.query?.active || 'all'
-  return success(res, await listCategories(req.tenantId, { active }))
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const active = req.query?.active || 'all'
+    return success(res, await listCategories(tenantId, { active, branchId }))
+  } catch (err) {
+    return scopeError(res, err)
+  }
 }
 
 export async function taxes(req, res) {
@@ -38,42 +49,52 @@ export async function offers(req, res) {
 
 export async function addCategory(req, res) {
   try {
-    const row = await createCategory(req.tenantId, { ...req.validated.body, imageUrl: uploadedUrl(req.file) })
+    const { tenantId, branchId } = resolveInventoryCreateScope(req)
+    const row = await createCategory(tenantId, {
+      ...req.validated.body,
+      imageUrl: uploadedUrl(req.file),
+      branchId,
+    })
     return success(res, row, 201)
   } catch (err) {
-    if (err?.status) return fail(res, err.message, err.status)
-    throw err
+    return scopeError(res, err)
   }
 }
 
 export async function patchCategory(req, res) {
   try {
-    const row = await updateCategory(req.tenantId, req.validated.params.id, {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const row = await updateCategory(tenantId, req.validated.params.id, {
       ...req.validated.body,
       ...(req.file ? { imageUrl: uploadedUrl(req.file) } : {}),
+      branchId,
     })
     if (!row) return fail(res, 'Category not found', 404)
     return success(res, row)
   } catch (err) {
-    if (err?.status) return fail(res, err.message, err.status)
-    throw err
+    return scopeError(res, err)
   }
 }
 
 export async function removeCategory(req, res) {
   try {
-    const row = await setCategoryActive(req.tenantId, req.validated.params.id, false)
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const row = await setCategoryActive(tenantId, req.validated.params.id, false, { branchId })
     if (!row) return fail(res, 'Category not found', 404)
     return success(res, { id: row.id, isActive: false, deactivated: true })
   } catch (err) {
-    if (err?.status) return fail(res, err.message, err.status)
-    throw err
+    return scopeError(res, err)
   }
 }
 
 export async function products(req, res) {
-  const result = await listProducts(req.tenantId, req.validated.query)
-  return success(res, paginatedResult(result.items, result))
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const result = await listProducts(tenantId, { ...req.validated.query, branchId })
+    return success(res, paginatedResult(result.items, result))
+  } catch (err) {
+    return scopeError(res, err)
+  }
 }
 
 export async function addProduct(req, res) {
@@ -83,16 +104,17 @@ export async function addProduct(req, res) {
   }
 
   try {
-    const row = await createProduct(req.tenantId, {
+    const { tenantId, branchId } = resolveInventoryCreateScope(req)
+    const row = await createProduct(tenantId, {
       ...body,
+      branchId,
       imageUrl: uploadedUrl(req.file),
       itemCode: generateItemCode(),
       barcode: generateBarcodeValue(),
     })
     return success(res, row, 201)
   } catch (err) {
-    if (err?.status) return fail(res, err.message, err.status)
-    throw err
+    return scopeError(res, err)
   }
 }
 
@@ -105,80 +127,116 @@ export async function addBundle(req, res) {
 }
 
 export async function importItems(req, res) {
-  const category = await findOrCreateImportedCategory(req.tenantId)
-  const created = []
-  const errors = []
+  try {
+    const { tenantId, branchId } = resolveInventoryCreateScope(req)
+    const category = await findOrCreateImportedCategory(tenantId, branchId)
+    const created = []
+    const errors = []
 
-  for (const [index, row] of req.validated.body.rows.entries()) {
-    try {
-      const product = await createProduct(req.tenantId, {
-        name: row.name,
-        categoryId: category.id,
-        type: PRODUCT_TYPES.SINGLE,
-        scale: row.scale || 'unit',
-        itemCode: row.sku,
-        barcode: row.barcode || generateBarcodeValue(),
-        purchasePrice: row.purchasePrice ?? 0,
-        sellingPrice: row.sellingPrice ?? 0,
-        quantity: row.quantity ?? 0,
-      })
-      created.push(product)
-    } catch (err) {
-      const message =
-        err?.code === '23505'
-          ? `Row ${index + 1}: item code or barcode already exists (${row.sku})`
-          : err?.message || `Row ${index + 1}: import failed`
-      errors.push(message)
+    for (const [index, row] of req.validated.body.rows.entries()) {
+      try {
+        const product = await createProduct(tenantId, {
+          name: row.name,
+          categoryId: category.id,
+          branchId,
+          type: PRODUCT_TYPES.SINGLE,
+          scale: row.scale || 'unit',
+          itemCode: row.sku,
+          barcode: row.barcode || generateBarcodeValue(),
+          purchasePrice: row.purchasePrice ?? 0,
+          sellingPrice: row.sellingPrice ?? 0,
+          quantity: row.quantity ?? 0,
+        })
+        created.push(product)
+      } catch (err) {
+        const message =
+          err?.code === '23505'
+            ? `Row ${index + 1}: item code or barcode already exists (${row.sku})`
+            : err?.message || `Row ${index + 1}: import failed`
+        errors.push(message)
+      }
     }
-  }
 
-  if (!created.length) {
-    return fail(res, errors[0] || 'No products imported', 409)
-  }
+    if (!created.length) {
+      return fail(res, errors[0] || 'No products imported', 409)
+    }
 
-  return success(
-    res,
-    {
-      imported: created.length,
-      failed: errors.length,
-      errors: errors.length ? errors : undefined,
-      items: created,
-    },
-    201,
-  )
+    return success(
+      res,
+      {
+        imported: created.length,
+        failed: errors.length,
+        errors: errors.length ? errors : undefined,
+        items: created,
+      },
+      201,
+    )
+  } catch (err) {
+    return scopeError(res, err)
+  }
 }
 
 export async function scan(req, res) {
-  const item = await findProductByBarcode(req.tenantId, req.validated.body.barcode)
-  if (!item) return fail(res, 'No item found for this barcode', 404)
-  return success(res, item)
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const item = await findProductByBarcode(tenantId, req.validated.body.barcode, { branchId })
+    if (!item) return fail(res, 'No item found for this barcode', 404)
+    return success(res, item)
+  } catch (err) {
+    return scopeError(res, err)
+  }
 }
 
 export async function detail(req, res) {
-  const row = await getProductDetail(req.tenantId, req.validated.params.id)
-  if (!row) return fail(res, 'Item not found', 404)
-  return success(res, row)
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const row = await getProductDetail(tenantId, req.validated.params.id, { branchId })
+    if (!row) return fail(res, 'Item not found', 404)
+    return success(res, row)
+  } catch (err) {
+    return scopeError(res, err)
+  }
 }
 
 export async function printBarcode(req, res) {
-  const item = await getProductById(req.tenantId, req.validated.params.id)
-  if (!item) return fail(res, 'Item not found', 404)
-  const png = await renderBarcodePng(item.barcode)
-  res.setHeader('Content-Type', 'image/png')
-  return res.send(png)
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const item = await getProductById(tenantId, req.validated.params.id, { branchId })
+    if (!item) return fail(res, 'Item not found', 404)
+    const png = await renderBarcodePng(item.barcode)
+    res.setHeader('Content-Type', 'image/png')
+    return res.send(png)
+  } catch (err) {
+    return scopeError(res, err)
+  }
 }
 
 export async function update(req, res) {
-  const row = await updateProduct(req.tenantId, req.validated.params.id, {
-    ...req.validated.body,
-    ...(req.file ? { imageUrl: uploadedUrl(req.file) } : {}),
-  })
-  if (!row) return fail(res, 'Item not found', 404)
-  return success(res, row)
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const row = await updateProduct(
+      tenantId,
+      req.validated.params.id,
+      {
+        ...req.validated.body,
+        ...(req.file ? { imageUrl: uploadedUrl(req.file) } : {}),
+      },
+      { branchId },
+    )
+    if (!row) return fail(res, 'Item not found', 404)
+    return success(res, row)
+  } catch (err) {
+    return scopeError(res, err)
+  }
 }
 
 export async function remove(req, res) {
-  const deactivated = await deleteProduct(req.tenantId, req.validated.params.id)
-  if (!deactivated) return fail(res, 'Item not found', 404)
-  return success(res, { id: req.validated.params.id, status: 'inactive', deactivated: true })
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const deactivated = await deleteProduct(tenantId, req.validated.params.id, { branchId })
+    if (!deactivated) return fail(res, 'Item not found', 404)
+    return success(res, { id: req.validated.params.id, status: 'inactive', deactivated: true })
+  } catch (err) {
+    return scopeError(res, err)
+  }
 }

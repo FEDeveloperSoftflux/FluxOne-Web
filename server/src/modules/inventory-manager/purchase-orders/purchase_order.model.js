@@ -9,7 +9,10 @@ function httpError(status, message) {
   return error
 }
 
-export async function listPurchaseOrders(tenantId, { q, supplierId, status, page = 1, limit = 8 } = {}) {
+export async function listPurchaseOrders(
+  tenantId,
+  { q, supplierId, status, page = 1, limit = 8, branchId = null } = {},
+) {
   const safePage = Math.max(1, Number(page) || 1)
   const safeLimit = Math.min(50, Math.max(1, Number(limit) || 8))
   const offset = (safePage - 1) * safeLimit
@@ -23,6 +26,7 @@ export async function listPurchaseOrders(tenantId, { q, supplierId, status, page
         po.status,
         po.explanation,
         po.created_at AS "createdAt",
+        po.branch_id AS "branchId",
         s.company_name AS "companyName",
         s.representative_name AS "representativeName",
         s.representative_phone AS "representativePhone",
@@ -35,11 +39,12 @@ export async function listPurchaseOrders(tenantId, { q, supplierId, status, page
         AND ($2::text IS NULL OR po.order_number ILIKE '%' || $2 || '%' OR s.company_name ILIKE '%' || $2 || '%')
         AND ($3::uuid IS NULL OR po.supplier_id = $3)
         AND ($4::text IS NULL OR po.status = $4)
+        AND ($5::uuid IS NULL OR po.branch_id = $5)
       GROUP BY po.id, s.company_name, s.representative_name, s.representative_phone
       ORDER BY po.created_at DESC
-      LIMIT $5 OFFSET $6
+      LIMIT $6 OFFSET $7
     `,
-    [q || null, supplierId || null, status || null, safeLimit, offset],
+    [q || null, supplierId || null, status || null, branchId || null, safeLimit, offset],
   )
 
   const total = rows[0]?._total || 0
@@ -47,7 +52,7 @@ export async function listPurchaseOrders(tenantId, { q, supplierId, status, page
   return { items, total, page: safePage, limit: safeLimit }
 }
 
-export async function getPurchaseOrderById(tenantId, id) {
+export async function getPurchaseOrderById(tenantId, id, { branchId = null } = {}) {
   const { rows: orders } = await tenantQuery(
     tenantId,
     `
@@ -57,6 +62,7 @@ export async function getPurchaseOrderById(tenantId, id) {
         po.status,
         po.explanation,
         po.created_at AS "createdAt",
+        po.branch_id AS "branchId",
         s.id AS "supplierId",
         s.company_name AS "companyName",
         s.representative_name AS "representativeName",
@@ -65,9 +71,10 @@ export async function getPurchaseOrderById(tenantId, id) {
       FROM purchase_orders po
       JOIN suppliers s ON s.id = po.supplier_id AND s.tenant_id = po.tenant_id
       WHERE po.tenant_id = $1 AND po.id = $2
+        AND ($3::uuid IS NULL OR po.branch_id = $3)
       LIMIT 1
     `,
-    [id],
+    [id, branchId || null],
   )
   const order = orders[0]
   if (!order) return null
@@ -96,6 +103,8 @@ export async function getPurchaseOrderById(tenantId, id) {
 }
 
 export async function generatePurchaseOrder(tenantId, payload) {
+  if (!payload.branchId) throw httpError(422, 'branchId is required to create a purchase order')
+
   const orderId = await withTransaction(async (client) => {
     const { rows: suppliers } = await tenantClientQuery(
       client,
@@ -103,10 +112,10 @@ export async function generatePurchaseOrder(tenantId, payload) {
       `
         SELECT id, is_active AS "isActive"
         FROM suppliers
-        WHERE tenant_id = $1 AND id = $2
+        WHERE tenant_id = $1 AND id = $2 AND branch_id = $3
         LIMIT 1
       `,
-      [payload.supplierId],
+      [payload.supplierId, payload.branchId],
     )
     if (!suppliers[0]) throw httpError(404, 'Supplier not found')
     if (!suppliers[0].isActive) {
@@ -121,9 +130,9 @@ export async function generatePurchaseOrder(tenantId, payload) {
       `
         SELECT id, purchase_price AS "purchasePrice", status
         FROM products
-        WHERE tenant_id = $1 AND id = ANY($2::uuid[])
+        WHERE tenant_id = $1 AND id = ANY($2::uuid[]) AND branch_id = $3
       `,
-      [productIds],
+      [productIds, payload.branchId],
     )
     const priceById = new Map(products.map((row) => [row.id, row.purchasePrice]))
     for (const line of lines) {
@@ -142,12 +151,19 @@ export async function generatePurchaseOrder(tenantId, payload) {
       tenantId,
       `
         INSERT INTO purchase_orders (
-          tenant_id, supplier_id, order_number, explanation, status, created_by
+          tenant_id, branch_id, supplier_id, order_number, explanation, status, created_by
         )
-        VALUES ($1, $2, $3, $4, $5, $6)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING id, order_number AS "orderNumber", status
       `,
-      [payload.supplierId, orderNumber, payload.explanation || null, PURCHASE_ORDER_STATUS.PENDING, payload.createdBy],
+      [
+        payload.branchId,
+        payload.supplierId,
+        orderNumber,
+        payload.explanation || null,
+        PURCHASE_ORDER_STATUS.PENDING,
+        payload.createdBy,
+      ],
     )
     const order = orders[0]
 
@@ -182,11 +198,11 @@ export async function generatePurchaseOrder(tenantId, payload) {
     return order.id
   })
 
-  return getPurchaseOrderById(tenantId, orderId)
+  return getPurchaseOrderById(tenantId, orderId, { branchId: payload.branchId })
 }
 
-export async function priceHistory(tenantId, id) {
-  const order = await getPurchaseOrderById(tenantId, id)
+export async function priceHistory(tenantId, id, { branchId = null } = {}) {
+  const order = await getPurchaseOrderById(tenantId, id, { branchId })
   if (!order) return null
 
   return {
@@ -212,18 +228,24 @@ export async function priceHistory(tenantId, id) {
   }
 }
 
-export async function receivePurchaseOrder(tenantId, purchaseOrderId, userId) {
+export async function receivePurchaseOrder(tenantId, purchaseOrderId, userId, { branchId = null } = {}) {
   return withTransaction(async (client) => {
     const { rows: orders } = await tenantClientQuery(
       client,
       tenantId,
       `
-        SELECT id, order_number AS "orderNumber", supplier_id AS "supplierId", status
+        SELECT
+          id,
+          order_number AS "orderNumber",
+          supplier_id AS "supplierId",
+          status,
+          branch_id AS "branchId"
         FROM purchase_orders
         WHERE tenant_id = $1 AND id = $2
+          AND ($3::uuid IS NULL OR branch_id = $3)
         FOR UPDATE
       `,
-      [purchaseOrderId],
+      [purchaseOrderId, branchId || null],
     )
     const order = orders[0]
     if (!order) throw httpError(404, 'Purchase order not found')
@@ -262,6 +284,9 @@ export async function receivePurchaseOrder(tenantId, purchaseOrderId, userId) {
           unitCost: line.unitCost,
           reason: `PO ${order.orderNumber}`,
           createdBy: userId,
+          // Branch scope: allocate stock-in to the PO's branch
+          branchId: order.branchId,
+          scopeBranchId: branchId || order.branchId,
         }),
       )
     }
@@ -281,16 +306,17 @@ export async function receivePurchaseOrder(tenantId, purchaseOrderId, userId) {
   })
 }
 
-export async function cancelPurchaseOrder(tenantId, id) {
+export async function cancelPurchaseOrder(tenantId, id, { branchId = null } = {}) {
   const { rows: existingRows } = await tenantQuery(
     tenantId,
     `
       SELECT id, status
       FROM purchase_orders
       WHERE tenant_id = $1 AND id = $2
+        AND ($3::uuid IS NULL OR branch_id = $3)
       LIMIT 1
     `,
-    [id],
+    [id, branchId || null],
   )
   const existing = existingRows[0]
   if (!existing) return null
@@ -304,23 +330,25 @@ export async function cancelPurchaseOrder(tenantId, id) {
       UPDATE purchase_orders
       SET status = $3
       WHERE tenant_id = $1 AND id = $2 AND status = $4
+        AND ($5::uuid IS NULL OR branch_id = $5)
       RETURNING id, order_number AS "orderNumber", status
     `,
-    [id, PURCHASE_ORDER_STATUS.CANCELLED, PURCHASE_ORDER_STATUS.PENDING],
+    [id, PURCHASE_ORDER_STATUS.CANCELLED, PURCHASE_ORDER_STATUS.PENDING, branchId || null],
   )
   return rows[0] || null
 }
 
-export async function approvePurchaseOrder(tenantId, id, userId) {
+export async function approvePurchaseOrder(tenantId, id, userId, { branchId = null } = {}) {
   const { rows: existingRows } = await tenantQuery(
     tenantId,
     `
       SELECT id, status
       FROM purchase_orders
       WHERE tenant_id = $1 AND id = $2
+        AND ($3::uuid IS NULL OR branch_id = $3)
       LIMIT 1
     `,
-    [id],
+    [id, branchId || null],
   )
   const existing = existingRows[0]
   if (!existing) return null
@@ -334,9 +362,10 @@ export async function approvePurchaseOrder(tenantId, id, userId) {
       UPDATE purchase_orders
       SET status = $3, approved_by = $4, approved_at = now()
       WHERE tenant_id = $1 AND id = $2 AND status = $5
+        AND ($6::uuid IS NULL OR branch_id = $6)
       RETURNING id, order_number AS "orderNumber", status, approved_at AS "approvedAt"
     `,
-    [id, PURCHASE_ORDER_STATUS.APPROVED, userId, PURCHASE_ORDER_STATUS.PENDING],
+    [id, PURCHASE_ORDER_STATUS.APPROVED, userId, PURCHASE_ORDER_STATUS.PENDING, branchId || null],
   )
   return rows[0] || null
 }
@@ -349,8 +378,8 @@ function escapeHtml(value) {
     .replaceAll('"', '&quot;')
 }
 
-export async function buildPurchaseOrderPrint(tenantId, id) {
-  const order = await getPurchaseOrderById(tenantId, id)
+export async function buildPurchaseOrderPrint(tenantId, id, { branchId = null } = {}) {
+  const order = await getPurchaseOrderById(tenantId, id, { branchId })
   if (!order) return null
 
   const lineRows = order.lines
@@ -409,8 +438,8 @@ export async function buildPurchaseOrderPrint(tenantId, id) {
   }
 }
 
-export async function sendPurchaseOrderSms(tenantId, id) {
-  const order = await getPurchaseOrderById(tenantId, id)
+export async function sendPurchaseOrderSms(tenantId, id, { branchId = null } = {}) {
+  const order = await getPurchaseOrderById(tenantId, id, { branchId })
   if (!order) return null
   if (!order.representativePhone) {
     throw httpError(422, 'Supplier representative phone is not set')

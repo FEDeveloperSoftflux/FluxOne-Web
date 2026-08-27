@@ -13,7 +13,8 @@ const supplierSelect = `
   registration_number AS "registrationNumber",
   bank_account_number AS "bankAccountNumber",
   signature_url AS "signatureUrl",
-  is_active AS "isActive"
+  is_active AS "isActive",
+  branch_id AS "branchId"
 `
 
 function activeSqlClause(active) {
@@ -22,7 +23,12 @@ function activeSqlClause(active) {
   return 'AND is_active = true'
 }
 
-export async function listSuppliers(tenantId, { q, page = 1, limit = 8, active = 'active' } = {}) {
+// Branch scope
+function branchClause(paramIndex) {
+  return `AND ($${paramIndex}::uuid IS NULL OR branch_id = $${paramIndex})`
+}
+
+export async function listSuppliers(tenantId, { q, page = 1, limit = 8, active = 'active', branchId = null } = {}) {
   const safePage = Math.max(1, Number(page) || 1)
   const safeLimit = Math.min(50, Math.max(1, Number(limit) || 8))
   const offset = (safePage - 1) * safeLimit
@@ -36,15 +42,16 @@ export async function listSuppliers(tenantId, { q, page = 1, limit = 8, active =
       FROM suppliers
       WHERE tenant_id = $1
         ${activeClause}
+        ${branchClause(2)}
         AND (
-          $2::text IS NULL
-          OR company_name ILIKE '%' || $2 || '%'
-          OR id::text ILIKE '%' || $2 || '%'
+          $3::text IS NULL
+          OR company_name ILIKE '%' || $3 || '%'
+          OR id::text ILIKE '%' || $3 || '%'
         )
       ORDER BY company_name
-      LIMIT $3 OFFSET $4
+      LIMIT $4 OFFSET $5
     `,
-    [q || null, safeLimit, offset],
+    [branchId, q || null, safeLimit, offset],
   )
 
   const total = rows[0]?._total || 0
@@ -53,18 +60,25 @@ export async function listSuppliers(tenantId, { q, page = 1, limit = 8, active =
 }
 
 export async function createSupplier(tenantId, payload) {
+  if (!payload.branchId) {
+    const error = new Error('branchId is required to create a supplier')
+    error.status = 422
+    throw error
+  }
+
   const { rows } = await tenantQuery(
     tenantId,
     `
       INSERT INTO suppliers (
-        tenant_id, company_name, image_url, company_phone, representative_name,
+        tenant_id, branch_id, company_name, image_url, company_phone, representative_name,
         representative_phone, representative_email, location, tax_paid,
         registration_number, bank_account_number, signature_url, is_active
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, true)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true)
       RETURNING ${supplierSelect}
     `,
     [
+      payload.branchId,
       payload.companyName,
       payload.imageUrl || null,
       payload.companyPhone || null,
@@ -81,7 +95,7 @@ export async function createSupplier(tenantId, payload) {
   return rows[0]
 }
 
-export async function updateSupplier(tenantId, id, payload) {
+export async function updateSupplier(tenantId, id, payload, { branchId = null } = {}) {
   const updatableColumns = {
     companyName: 'company_name',
     companyPhone: 'company_phone',
@@ -98,7 +112,7 @@ export async function updateSupplier(tenantId, id, payload) {
   }
 
   const setClauses = []
-  const params = [id]
+  const params = [id, branchId]
 
   for (const [payloadKey, column] of Object.entries(updatableColumns)) {
     if (!(payloadKey in payload)) continue
@@ -114,9 +128,10 @@ export async function updateSupplier(tenantId, id, payload) {
         SELECT ${supplierSelect}
         FROM suppliers
         WHERE tenant_id = $1 AND id = $2
+          ${branchClause(3)}
         LIMIT 1
       `,
-      [id],
+      [id, branchId],
     )
     return rows[0] || null
   }
@@ -127,6 +142,7 @@ export async function updateSupplier(tenantId, id, payload) {
       UPDATE suppliers
       SET ${setClauses.join(', ')}
       WHERE tenant_id = $1 AND id = $2
+        ${branchClause(3)}
       RETURNING ${supplierSelect}
     `,
     params,
@@ -134,36 +150,38 @@ export async function updateSupplier(tenantId, id, payload) {
   return rows[0] || null
 }
 
-export async function setSupplierActive(tenantId, id, isActive) {
+export async function setSupplierActive(tenantId, id, isActive, { branchId = null } = {}) {
   const { rows } = await tenantQuery(
     tenantId,
     `
       UPDATE suppliers
       SET is_active = $2
       WHERE tenant_id = $1 AND id = $3
+        ${branchClause(4)}
       RETURNING ${supplierSelect}
     `,
-    [isActive, id],
+    [isActive, id, branchId],
   )
   return rows[0] || null
 }
 
 /** Soft-deactivate supplier (replaces hard delete for client UX). */
-export async function deleteSupplier(tenantId, id) {
-  const row = await setSupplierActive(tenantId, id, false)
+export async function deleteSupplier(tenantId, id, { branchId = null } = {}) {
+  const row = await setSupplierActive(tenantId, id, false, { branchId })
   return Boolean(row)
 }
 
-export async function assertSupplierActive(tenantId, id) {
+export async function assertSupplierActive(tenantId, id, { branchId = null } = {}) {
   const { rows } = await tenantQuery(
     tenantId,
     `
-      SELECT id, is_active AS "isActive", company_name AS "companyName"
+      SELECT id, is_active AS "isActive", company_name AS "companyName", branch_id AS "branchId"
       FROM suppliers
       WHERE tenant_id = $1 AND id = $2
+        ${branchClause(3)}
       LIMIT 1
     `,
-    [id],
+    [id, branchId],
   )
   const row = rows[0]
   if (!row) {

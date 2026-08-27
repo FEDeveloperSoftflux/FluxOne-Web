@@ -1,18 +1,39 @@
 import { getOverviewKpis, listStockAlerts, listStockOutGraph } from './dashboard.model.js'
-import { success } from '../../../utils/response.util.js'
+import { resolveInventoryScope } from '../shared.access.js'
+import { fail, success } from '../../../utils/response.util.js'
 import { paginatedResult } from '../../../utils/pagination.util.js'
 
+function scopeError(res, err) {
+  if (err?.status) return fail(res, err.message, err.status)
+  throw err
+}
+
 export async function overview(req, res) {
-  const data = await getOverviewKpis(req.tenantId)
-  return success(res, data)
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const data = await getOverviewKpis(tenantId, { branchId })
+    return success(res, data)
+  } catch (err) {
+    return scopeError(res, err)
+  }
 }
 
 export async function alerts(req, res) {
-  const result = await listStockAlerts(req.tenantId, req.validated.query)
-  return success(res, paginatedResult(result.items, result))
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const result = await listStockAlerts(tenantId, { ...req.validated.query, branchId })
+    return success(res, paginatedResult(result.items, result))
+  } catch (err) {
+    return scopeError(res, err)
+  }
 }
 
 export async function stockGraph(req, res) {
-  const data = await listStockOutGraph(req.tenantId, req.validated.query)
-  return success(res, data)
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const data = await listStockOutGraph(tenantId, { ...req.validated.query, branchId })
+    return success(res, data)
+  } catch (err) {
+    return scopeError(res, err)
+  }
 }

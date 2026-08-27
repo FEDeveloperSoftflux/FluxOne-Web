@@ -3,6 +3,7 @@ import { createAsyncThunk, createSlice } from '@reduxjs/toolkit'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
 import { tokenStorage } from '@/api/tokenStorage'
+import { invalidateProductCatalog } from '@/lib/productCatalogCache'
 
 const storedUser = tokenStorage.getUser()
 const storedToken = tokenStorage.getToken()
@@ -73,6 +74,7 @@ const authSlice = createSlice({
       state.isAuthenticated = Boolean((token ?? state.token) && (user ?? state.user))
     },
     sessionExpired(state) {
+      invalidateProductCatalog()
       clearSessionState(state)
     },
     clearAuthError(state) {
@@ -86,6 +88,7 @@ const authSlice = createSlice({
         state.error = null
       })
       .addCase(loginUser.fulfilled, (state, action) => {
+        invalidateProductCatalog()
         state.status = 'succeeded'
         state.user = action.payload.user
         state.token = action.payload.token
@@ -104,6 +107,7 @@ const authSlice = createSlice({
       })
       .addCase(logoutUser.pending, (state) => {
         tokenStorage.clear()
+        invalidateProductCatalog()
         clearSessionState(state)
       })
       .addCase(logoutUser.fulfilled, (state) => {
@@ -112,6 +116,7 @@ const authSlice = createSlice({
       .addCase(logoutUser.rejected, (state) => {
         // Still signed out locally even if API failed
         tokenStorage.clear()
+        invalidateProductCatalog()
         clearSessionState(state)
       })
       .addCase(updateProfile.fulfilled, (state, action) => {
