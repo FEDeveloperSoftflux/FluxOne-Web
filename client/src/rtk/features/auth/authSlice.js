@@ -1,3 +1,4 @@
+// Auth Slice — Express /api/auth → RTK → AuthContext / useAuthSession → UI
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'

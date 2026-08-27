@@ -55,12 +55,20 @@ export function StaffFormDialog({
         email: initialStaff.email || '',
         password: '',
         fullName: initialStaff.fullName || '',
-        role:
-          initialStaff.role === 'cashier' || initialStaff.role === 'inventory_manager'
-            ? initialStaff.role
-            : initialStaff.designation?.toLowerCase().includes('cashier')
-              ? 'cashier'
-              : 'inventory_manager',
+        role: (() => {
+          const allowed = [
+            'inventory_manager',
+            'cashier',
+            'production_staff',
+            'delivery_staff',
+          ]
+          if (allowed.includes(initialStaff.role)) return initialStaff.role
+          const designation = String(initialStaff.designation || '').toLowerCase()
+          if (designation.includes('delivery')) return 'delivery_staff'
+          if (designation.includes('production')) return 'production_staff'
+          if (designation.includes('cashier')) return 'cashier'
+          return 'inventory_manager'
+        })(),
         hardwareDeviceId: initialStaff.hardwareDeviceId || '',
         scheduleStart: timeInputValue(initialStaff.scheduleStart),
         scheduleBreakStart: timeInputValue(initialStaff.scheduleBreakStart),
@@ -164,6 +172,8 @@ export function StaffFormDialog({
               >
                 <option value="inventory_manager">Inventory Manager</option>
                 <option value="cashier">Cashier</option>
+                <option value="production_staff">Production Staff</option>
+                <option value="delivery_staff">Delivery Staff</option>
               </NativeSelect>
             </div>
 

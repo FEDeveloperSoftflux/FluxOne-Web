@@ -30,7 +30,7 @@ export const listStaffSchema = z.object({
     designationId: optionalUuid,
     status: staffStatusEnum.optional(),
     branchId: optionalUuid,
-    role: z.enum(['inventory_manager', 'cashier']).optional(),
+    role: z.enum(['inventory_manager', 'cashier', 'production_staff', 'delivery_staff']).optional(),
   }),
 })
 
@@ -41,7 +41,7 @@ export const createStaffSchema = z
       /** Login ID (same field used by /auth/login as `id`). */
       email: z.string().min(3).max(190),
       password: z.string().min(8),
-      role: z.enum(['inventory_manager', 'cashier']),
+      role: z.enum(['inventory_manager', 'cashier', 'production_staff', 'delivery_staff']),
       designationId: optionalUuid,
       designation: optionalString,
       branchId: optionalUuid,
@@ -75,7 +75,7 @@ export const updateStaffSchema = z.object({
     fullName: z.string().min(1).optional(),
     email: z.string().min(3).max(190).optional(),
     phone: optionalString,
-    role: z.enum(['inventory_manager', 'cashier']).optional(),
+    role: z.enum(['inventory_manager', 'cashier', 'production_staff', 'delivery_staff']).optional(),
     designationId: optionalUuid,
     designation: optionalString,
     branchId: optionalUuid,

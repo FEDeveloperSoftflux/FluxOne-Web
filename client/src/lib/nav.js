@@ -18,6 +18,9 @@ export const NAV_BY_ROLE = {
   ],
   [ROLES.INVENTORY_MANAGER]: INVENTORY_NAV,
   [ROLES.B2B_ADMIN]: INVENTORY_NAV,
+  // Phase 2: logo + profile + logout only (no module links yet)
+  [ROLES.PRODUCTION_STAFF]: [],
+  [ROLES.DELIVERY_STAFF]: [],
 }
 
 export function getNavItemsForRole(role) {
@@ -28,6 +31,9 @@ export function roleDisplayName(role) {
   if (role === ROLES.BRANCH_MANAGER) return 'Branch Manager'
   if (role === ROLES.INVENTORY_MANAGER) return 'Inventory Manager'
   if (role === ROLES.B2B_ADMIN) return 'B2B Admin'
+  if (role === ROLES.CASHIER) return 'Cashier'
+  if (role === ROLES.PRODUCTION_STAFF) return 'Production Staff'
+  if (role === ROLES.DELIVERY_STAFF) return 'Delivery Staff'
   return role || 'User'
 }
 

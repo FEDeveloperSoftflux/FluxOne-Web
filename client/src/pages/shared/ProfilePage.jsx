@@ -6,7 +6,7 @@ import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { useAuthSession } from '@/hooks/useAuthSession'
 import { formatLoginExpires, getTokenExpiryDate } from '@/lib/authToken'
 import { roleDisplayName } from '@/lib/nav'
-import { homePathForRole, INVENTORY_ROLES, BRANCH_ROLES, PATHS } from '@/router/paths'
+import { homePathForRole, INVENTORY_ROLES, BRANCH_ROLES, PHASE2_ROLES, PATHS } from '@/router/paths'
 import { useAppDispatch } from '@/rtk/hooks'
 import { updateProfile } from '@/rtk/features/auth/authSlice'
 import { toastError, toastSuccess } from '@/lib/toast'
@@ -21,7 +21,10 @@ export function ProfilePage() {
   const [editOpen, setEditOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  const allowed = BRANCH_ROLES.includes(role) || INVENTORY_ROLES.includes(role)
+  const allowed =
+    BRANCH_ROLES.includes(role) ||
+    INVENTORY_ROLES.includes(role) ||
+    PHASE2_ROLES.includes(role)
 
   const loginExpires = useMemo(() => {
     return formatLoginExpires(getTokenExpiryDate(token))

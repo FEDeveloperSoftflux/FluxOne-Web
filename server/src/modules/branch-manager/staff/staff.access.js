@@ -10,6 +10,8 @@ function httpError(status, message) {
 export const STAFF_ROLE_TO_DESIGNATION = {
   [ROLES.INVENTORY_MANAGER]: 'Inventory Manager',
   [ROLES.CASHIER]: 'Cashier',
+  [ROLES.PRODUCTION_STAFF]: 'Production Staff',
+  [ROLES.DELIVERY_STAFF]: 'Delivery Staff',
 }
 
 /**

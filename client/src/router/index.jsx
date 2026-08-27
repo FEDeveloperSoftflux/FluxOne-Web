@@ -1,12 +1,20 @@
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
-import { PATHS, INVENTORY_ROLES, BRANCH_ROLES, profilePathForRole } from '@/router/paths'
+import {
+  PATHS,
+  INVENTORY_ROLES,
+  BRANCH_ROLES,
+  PHASE2_ROLES,
+  profilePathForRole,
+} from '@/router/paths'
 import { AuthGate } from '@/router/guards/AuthGate'
 import { RoleGate } from '@/router/guards/RoleGate'
 import { InventoryLayout } from '@/layouts/InventoryLayout'
 import { BranchManagerLayout } from '@/layouts/BranchManagerLayout'
+import { WorkspaceLayout } from '@/layouts/WorkspaceLayout'
 import { SplashPage } from '@/pages/splash/SplashPage'
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { ProfilePage } from '@/pages/shared/ProfilePage'
+import { ComingSoonPage } from '@/pages/workspace/ComingSoonPage'
 import { DashboardPage as InventoryDashboardPage } from '@/pages/inventory/DashboardPage'
 import { ProductsPage } from '@/pages/inventory/ProductsPage'
 import { InventoryControlPage } from '@/pages/inventory/InventoryControlPage'
@@ -56,6 +64,19 @@ const router = createBrowserRouter([
             children: [
               { index: true, element: <BranchDashboardPage /> },
               { path: 'staff', element: <StaffPage /> },
+              { path: 'profile', element: <ProfilePage /> },
+            ],
+          },
+        ],
+      },
+      {
+        element: <RoleGate roles={PHASE2_ROLES} />,
+        children: [
+          {
+            path: PATHS.workspace.root,
+            element: <WorkspaceLayout />,
+            children: [
+              { index: true, element: <ComingSoonPage /> },
               { path: 'profile', element: <ProfilePage /> },
             ],
           },

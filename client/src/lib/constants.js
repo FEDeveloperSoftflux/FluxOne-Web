@@ -19,6 +19,9 @@ export const ROLES = {
   INVENTORY_MANAGER: 'inventory_manager',
   BRANCH_MANAGER: 'branch_manager',
   B2B_ADMIN: 'b2b_admin',
+  CASHIER: 'cashier',
+  PRODUCTION_STAFF: 'production_staff',
+  DELIVERY_STAFF: 'delivery_staff',
 }
 
 //Seeded demo accounts (password for all: password).

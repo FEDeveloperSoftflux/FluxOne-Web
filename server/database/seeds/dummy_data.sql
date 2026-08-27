@@ -85,10 +85,14 @@ INSERT INTO offers (id, tenant_id, name, percent) VALUES
   ('bb222222-2222-2222-2222-222222222201', '22222222-2222-2222-2222-222222222222', 'Seasonal', 10)
 ON CONFLICT (id) DO NOTHING;
 
--- Staff designations (B2B Admin master data). BM assigns Inventory Manager / Cashier only.
+-- Staff designations (B2B Admin master data). BM assigns staff roles from dropdown.
 INSERT INTO designations (tenant_id, name) VALUES
   ('11111111-1111-1111-1111-111111111111', 'Inventory Manager'),
   ('11111111-1111-1111-1111-111111111111', 'Cashier'),
+  ('11111111-1111-1111-1111-111111111111', 'Production Staff'),
+  ('11111111-1111-1111-1111-111111111111', 'Delivery Staff'),
   ('22222222-2222-2222-2222-222222222222', 'Inventory Manager'),
-  ('22222222-2222-2222-2222-222222222222', 'Cashier')
+  ('22222222-2222-2222-2222-222222222222', 'Cashier'),
+  ('22222222-2222-2222-2222-222222222222', 'Production Staff'),
+  ('22222222-2222-2222-2222-222222222222', 'Delivery Staff')
 ON CONFLICT (tenant_id, name) DO NOTHING;

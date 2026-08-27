@@ -32,6 +32,8 @@ function designationLabel(row) {
   if (row?.designation) return row.designation
   if (row?.role === 'inventory_manager') return 'Inventory Manager'
   if (row?.role === 'cashier') return 'Cashier'
+  if (row?.role === 'production_staff') return 'Production Staff'
+  if (row?.role === 'delivery_staff') return 'Delivery Staff'
   return '—'
 }
 
@@ -58,7 +60,7 @@ export function StaffTable({
     <SurfaceCard
       className={className}
       title="Team roster"
-      description="Inventory managers & cashiers for this branch"
+      description="Branch staff roles for this location"
       actions={
         <span className="text-xs font-medium text-slate-400">
           {pagination?.total ?? list.length} member

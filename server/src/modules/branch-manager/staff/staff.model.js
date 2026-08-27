@@ -58,7 +58,7 @@ export async function listStaff(tenantId, filters = {}) {
       JOIN users u ON u.id = s.user_id AND u.tenant_id = s.tenant_id
       JOIN roles r ON r.id = u.role_id
       WHERE s.tenant_id = $1
-        AND r.slug IN ('inventory_manager', 'cashier')
+        AND r.slug IN ('inventory_manager', 'cashier', 'production_staff', 'delivery_staff')
         AND (
           $2::text IS NULL
           OR u.full_name ILIKE '%' || $2 || '%'
@@ -82,7 +82,7 @@ export async function listStaff(tenantId, filters = {}) {
       JOIN roles r ON r.id = u.role_id
       LEFT JOIN designations d ON d.id = s.designation_id AND d.tenant_id = s.tenant_id
       WHERE s.tenant_id = $1
-        AND r.slug IN ('inventory_manager', 'cashier')
+        AND r.slug IN ('inventory_manager', 'cashier', 'production_staff', 'delivery_staff')
         AND (
           $2::text IS NULL
           OR u.full_name ILIKE '%' || $2 || '%'
@@ -114,7 +114,7 @@ export async function getStaffById(tenantId, id, { branchId } = {}) {
       WHERE s.tenant_id = $1
         AND s.id = $2
         AND ($3::uuid IS NULL OR s.branch_id = $3)
-        AND r.slug IN ('inventory_manager', 'cashier')
+        AND r.slug IN ('inventory_manager', 'cashier', 'production_staff', 'delivery_staff')
       LIMIT 1
     `,
     [id, branchId || null],
@@ -166,6 +166,27 @@ async function lookupDesignation(client, tenantId, { designationId, designationN
   return { designationId: rows[0].id, designationName: rows[0].name }
 }
 
+// Ensure fixed staff-role designation exists for this tenant (create if missing).
+async function ensureDesignationByName(client, tenantId, name) {
+  try {
+    return await lookupDesignation(client, tenantId, { designationName: name })
+  } catch (err) {
+    if (err?.status !== 400) throw err
+  }
+
+  const { rows } = await tenantClientQuery(
+    client,
+    tenantId,
+    `
+      INSERT INTO designations (tenant_id, name, is_active)
+      VALUES ($1, $2, TRUE)
+      RETURNING id, name
+    `,
+    [name],
+  )
+  return { designationId: rows[0].id, designationName: rows[0].name }
+}
+
 async function resolveStaffDesignation(client, tenantId, payload) {
   if (payload.designationId) {
     return lookupDesignation(client, tenantId, { designationId: payload.designationId })
@@ -179,7 +200,7 @@ async function resolveStaffDesignation(client, tenantId, payload) {
     payload.role || Object.keys(ROLE_IDS).find((key) => ROLE_IDS[key] === payload.roleId)
   const mappedName = STAFF_ROLE_TO_DESIGNATION[roleSlug]
   if (mappedName) {
-    return lookupDesignation(client, tenantId, { designationName: mappedName })
+    return ensureDesignationByName(client, tenantId, mappedName)
   }
 
   throw httpError(400, 'designationId, designation, or a valid staff role is required')
@@ -190,12 +211,20 @@ export async function createStaffUser(tenantId, payload) {
     throw httpError(400, 'branchId is required')
   }
 
-  const allowedRoles = [ROLES.INVENTORY_MANAGER, ROLES.CASHIER]
+  const allowedRoles = [
+    ROLES.INVENTORY_MANAGER,
+    ROLES.CASHIER,
+    ROLES.PRODUCTION_STAFF,
+    ROLES.DELIVERY_STAFF,
+  ]
   const roleSlug =
     payload.role ||
     Object.entries(ROLE_IDS).find(([, id]) => id === payload.roleId)?.[0]
   if (!allowedRoles.includes(roleSlug)) {
-    throw httpError(400, 'Staff role must be inventory_manager or cashier')
+    throw httpError(
+      400,
+      'Staff role must be inventory_manager, cashier, production_staff, or delivery_staff',
+    )
   }
 
   try {
@@ -278,7 +307,7 @@ async function getStaffByIdInTx(client, tenantId, id, { branchId } = {}) {
       WHERE s.tenant_id = $1
         AND s.id = $2
         AND ($3::uuid IS NULL OR s.branch_id = $3)
-        AND r.slug IN ('inventory_manager', 'cashier')
+        AND r.slug IN ('inventory_manager', 'cashier', 'production_staff', 'delivery_staff')
       LIMIT 1
     `,
     [id, branchId || null],

@@ -4,6 +4,8 @@ export const ROLES = {
   B2B_ADMIN: 'b2b_admin',
   CASHIER: 'cashier',
   BRANCH_ADMIN: 'branch_admin',
+  PRODUCTION_STAFF: 'production_staff',
+  DELIVERY_STAFF: 'delivery_staff',
 }
 
 export const ROLE_IDS = {
@@ -12,6 +14,8 @@ export const ROLE_IDS = {
   [ROLES.B2B_ADMIN]: 3,
   [ROLES.CASHIER]: 4,
   [ROLES.BRANCH_ADMIN]: 5,
+  [ROLES.PRODUCTION_STAFF]: 6,
+  [ROLES.DELIVERY_STAFF]: 7,
 }
 
 export const PRODUCT_TYPES = {
