@@ -1,10 +1,10 @@
 import { Pencil, Trash2, Users } from 'lucide-react'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { EntityStatusToggle } from '@/components/shared/EntityStatusToggle'
 import { Pagination } from '@/components/shared/Pagination'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import { NativeSelect } from '@/components/ui/select'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { staffInitials } from '@/lib/mapBranchDashboard'
 import { BRAND } from '@/lib/constants'
@@ -123,26 +123,22 @@ export function StaffTable({
                     <td className="px-2 py-3 text-slate-700">{designationLabel(row)}</td>
                     <td className="px-2 py-3 text-xs text-slate-600">
                       <span className="whitespace-nowrap">
-                        {formatTime(row.scheduleStart)} / {formatTime(row.scheduleBreakStart)} /{' '}
-                        {formatTime(row.scheduleEnd)}
+                        {formatTime(row.scheduleStart)} – {formatTime(row.scheduleEnd)}
                       </span>
+                      {row.scheduleBreakStart || row.scheduleBreakEnd ? (
+                        <span className="mt-0.5 block text-slate-400">
+                          Break {formatTime(row.scheduleBreakStart)}
+                          {row.scheduleBreakEnd ? ` – ${formatTime(row.scheduleBreakEnd)}` : ''}
+                        </span>
+                      ) : null}
                     </td>
                     <td className="px-2 py-3 text-slate-600">{row.hardwareDeviceId || '—'}</td>
                     <td className="px-2 py-3">
-                      <NativeSelect
-                        aria-label={`Status for ${row.fullName || row.email}`}
-                        value={
-                          row.status === 'inactive' || row.status === 'blocked'
-                            ? 'inactive'
-                            : 'active'
-                        }
-                        disabled={statusUpdatingId === row.id}
-                        className="h-9 w-[7.5rem]"
-                        onChange={(event) => onStatusChange?.(row, event.target.value)}
-                      >
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                      </NativeSelect>
+                      <EntityStatusToggle
+                        status={row.status}
+                        loading={statusUpdatingId === row.id}
+                        onChange={(nextActive) => onStatusChange?.(row, nextActive)}
+                      />
                     </td>
                     <td className="px-2 py-3">
                       <div className="flex items-center justify-end gap-1">

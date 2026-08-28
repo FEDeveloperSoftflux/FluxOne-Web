@@ -7,6 +7,7 @@ import { ProductFilters } from '@/components/feature/products/ProductFilters'
 import { ProductTable } from '@/components/feature/products/ProductTable'
 import { ScanItemDialog } from '@/components/feature/products/ScanItemDialog'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import { useProducts } from '@/hooks/useProducts'
@@ -60,6 +61,7 @@ export function ProductsPage() {
   const [importOpen, setImportOpen] = useState(false)
   const [scanOpen, setScanOpen] = useState(false)
   const [printTarget, setPrintTarget] = useState(null)
+  const [statusTarget, setStatusTarget] = useState(null)
   const [statusUpdatingId, setStatusUpdatingId] = useState(null)
 
   const activeParents = (catalog.parents || []).filter((row) => row.isActive !== false)
@@ -107,8 +109,8 @@ export function ProductsPage() {
     setPrintTarget(product)
   }
 
-  async function handleStatusChange(row, status) {
-    if (!row?.id || row.status === status) return
+  async function applyProductStatus(row, status) {
+    if (!row?.id) return
     setStatusUpdatingId(row.id)
     try {
       const result = await setProductStatus(row.id, status)
@@ -117,6 +119,21 @@ export function ProductsPage() {
     } finally {
       setStatusUpdatingId(null)
     }
+  }
+
+  function handleStatusChange(row, status) {
+    if (!row?.id || row.status === status) return
+    if (status === PRODUCT_STATUS.INACTIVE) {
+      setStatusTarget(row)
+      return
+    }
+    void applyProductStatus(row, status)
+  }
+
+  async function handleConfirmDeactivate() {
+    if (!statusTarget?.id) return
+    await applyProductStatus(statusTarget, PRODUCT_STATUS.INACTIVE)
+    setStatusTarget(null)
   }
 
   async function handleExport() {
@@ -279,6 +296,22 @@ export function ProductsPage() {
         }}
         product={printTarget}
         fetchBarcodePng={fetchBarcodePng}
+      />
+
+      <ConfirmDialog
+        open={Boolean(statusTarget)}
+        onOpenChange={(open) => {
+          if (!open) setStatusTarget(null)
+        }}
+        title="Deactivate product?"
+        description={
+          statusTarget
+            ? `${statusTarget.name || 'This product'} will be hidden from active lists. You can reactivate it later.`
+            : undefined
+        }
+        confirmLabel="Deactivate"
+        loading={mutating}
+        onConfirm={handleConfirmDeactivate}
       />
     </div>
   )

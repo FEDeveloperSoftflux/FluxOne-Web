@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
 import { BRAND } from '@/lib/constants'
+import { validateStaffForm } from '@/lib/validation/staffSchedule'
 
 const EMPTY_FORM = {
   email: '',
@@ -21,6 +22,7 @@ const EMPTY_FORM = {
   hardwareDeviceId: '',
   scheduleStart: '',
   scheduleBreakStart: '',
+  scheduleBreakEnd: '',
   scheduleEnd: '',
   image: null,
 }
@@ -72,6 +74,7 @@ export function StaffFormDialog({
         hardwareDeviceId: initialStaff.hardwareDeviceId || '',
         scheduleStart: timeInputValue(initialStaff.scheduleStart),
         scheduleBreakStart: timeInputValue(initialStaff.scheduleBreakStart),
+        scheduleBreakEnd: timeInputValue(initialStaff.scheduleBreakEnd),
         scheduleEnd: timeInputValue(initialStaff.scheduleEnd),
         image: null,
       })
@@ -88,20 +91,9 @@ export function StaffFormDialog({
     event.preventDefault()
     setError(null)
 
-    if (!form.fullName.trim()) {
-      setError('Name is required')
-      return
-    }
-    if (!form.email.trim()) {
-      setError('ID (login) is required')
-      return
-    }
-    if (!isEdit && (!form.password || form.password.length < 8)) {
-      setError('Password must be at least 8 characters')
-      return
-    }
-    if (isEdit && form.password && form.password.length < 8) {
-      setError('Password must be at least 8 characters')
+    const validationError = validateStaffForm(form, { isEdit })
+    if (validationError) {
+      setError(validationError)
       return
     }
 
@@ -198,12 +190,22 @@ export function StaffFormDialog({
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="staff-break">Break Time</Label>
+              <Label htmlFor="staff-break-start">Break from</Label>
               <Input
-                id="staff-break"
+                id="staff-break-start"
                 type="time"
                 value={form.scheduleBreakStart}
                 onChange={(e) => patch('scheduleBreakStart', e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="staff-break-end">Break to</Label>
+              <Input
+                id="staff-break-end"
+                type="time"
+                value={form.scheduleBreakEnd}
+                onChange={(e) => patch('scheduleBreakEnd', e.target.value)}
               />
             </div>
 

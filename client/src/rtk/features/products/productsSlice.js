@@ -11,6 +11,7 @@ import {
 import { productsToCsv } from '@/lib/productCsv'
 import {
   getProductCatalog,
+  patchCatalogCategoryActive,
   peekProductCatalog,
   refreshProductCategories,
 } from '@/lib/productCatalogCache'
@@ -327,11 +328,11 @@ export const deleteCategory = createAsyncThunk(
 
 export const setCategoryActive = createAsyncThunk(
   'products/setCategoryActive',
-  async ({ id, isActive }, { dispatch, rejectWithValue }) => {
+  async ({ id, isActive }, { rejectWithValue }) => {
     const result = await apiClient.patch(endpoints.products.category(id), { isActive })
     if (!result.success) return rejectWithValue(result.error || 'Status update failed')
-    await dispatch(reloadProductCategories())
-    return result
+    patchCatalogCategoryActive(id, isActive)
+    return { id, isActive }
   },
 )
 
@@ -413,7 +414,17 @@ const productsSlice = createSlice({
       .addCase(setProductStatus.fulfilled, (state, action) => {
         state.mutating = false
         const { id, status } = action.payload
-        state.items = state.items.map((row) => (row.id === id ? { ...row, status } : row))
+        const isActive = status !== 'inactive' && status !== 'close'
+        const statusFilter = state.filters.status
+        const shouldRemove =
+          (statusFilter === 'active' && !isActive) ||
+          (statusFilter === 'inactive' && isActive)
+        if (shouldRemove) {
+          state.items = state.items.filter((row) => row.id !== id)
+          if (state.pagination.total > 0) state.pagination.total -= 1
+        } else {
+          state.items = state.items.map((row) => (row.id === id ? { ...row, status } : row))
+        }
       })
       .addCase(setProductStatus.rejected, (state) => {
         state.mutating = false
@@ -475,8 +486,16 @@ const productsSlice = createSlice({
       .addCase(setCategoryActive.pending, (state) => {
         state.mutating = true
       })
-      .addCase(setCategoryActive.fulfilled, (state) => {
+      .addCase(setCategoryActive.fulfilled, (state, action) => {
         state.mutating = false
+        const { id, isActive } = action.payload
+        const patchRow = (row) => (row.id === id ? { ...row, isActive } : row)
+        state.catalog.parents = (state.catalog.parents || []).map(patchRow)
+        const children = state.catalog.childrenByParent || {}
+        for (const parentId of Object.keys(children)) {
+          children[parentId] = (children[parentId] || []).map(patchRow)
+        }
+        state.catalog.all = (state.catalog.all || []).map(patchRow)
       })
       .addCase(setCategoryActive.rejected, (state) => {
         state.mutating = false

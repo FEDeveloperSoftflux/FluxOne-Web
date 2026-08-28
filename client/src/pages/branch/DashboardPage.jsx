@@ -1,4 +1,5 @@
 import { BranchKpiCards } from '@/components/feature/branch/dashboard/BranchKpiCards'
+import { BranchWelcomeBanner } from '@/components/feature/branch/dashboard/BranchWelcomeBanner'
 import { InventoryStatusChart } from '@/components/feature/branch/dashboard/InventoryStatusChart'
 import { ProductSalesInsights } from '@/components/feature/branch/dashboard/ProductSalesInsights'
 import { SalesChart } from '@/components/feature/branch/dashboard/SalesChart'
@@ -40,6 +41,8 @@ export function DashboardPage() {
         />
       </MotionHeader>
 
+      <BranchWelcomeBanner />
+
       <div
         className={cn(
           'space-y-5 transition-opacity duration-300 sm:space-y-6',
@@ -78,6 +81,4 @@ export function DashboardPage() {
   )
 }
 
-/** @deprecated Prefer DashboardPage — kept for older imports */
-export const Dashboard = DashboardPage
 export default DashboardPage

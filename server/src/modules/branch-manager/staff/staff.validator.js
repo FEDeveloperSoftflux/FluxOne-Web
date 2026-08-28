@@ -8,6 +8,7 @@ import {
   optionalUuid,
   paginationQuery,
 } from '../shared.validator.js'
+import { refineStaffSchedule } from './schedule.validation.js'
 
 const staffStatusEnum = z
   .enum([
@@ -68,28 +69,33 @@ export const createStaffSchema = z
         path: ['body', 'role'],
       })
     }
+    refineStaffSchedule(body, ctx)
   })
 
-export const updateStaffSchema = z.object({
-  body: z.object({
-    fullName: z.string().min(1).optional(),
-    email: z.string().min(3).max(190).optional(),
-    phone: optionalString,
-    role: z.enum(['inventory_manager', 'cashier', 'production_staff', 'delivery_staff']).optional(),
-    designationId: optionalUuid,
-    designation: optionalString,
-    branchId: optionalUuid,
-    hardwareDeviceId: optionalString,
-    status: staffStatusEnum.optional(),
-    scheduleStart: optionalTime,
-    scheduleBreakStart: optionalTime,
-    scheduleBreakEnd: optionalTime,
-    scheduleEnd: optionalTime,
-    password: z.string().min(8).optional(),
-  }),
-  query: empty,
-  params: idParams,
-})
+export const updateStaffSchema = z
+  .object({
+    body: z.object({
+      fullName: z.string().min(1).optional(),
+      email: z.string().min(3).max(190).optional(),
+      phone: optionalString,
+      role: z.enum(['inventory_manager', 'cashier', 'production_staff', 'delivery_staff']).optional(),
+      designationId: optionalUuid,
+      designation: optionalString,
+      branchId: optionalUuid,
+      hardwareDeviceId: optionalString,
+      status: staffStatusEnum.optional(),
+      scheduleStart: optionalTime,
+      scheduleBreakStart: optionalTime,
+      scheduleBreakEnd: optionalTime,
+      scheduleEnd: optionalTime,
+      password: z.string().min(8).optional(),
+    }),
+    query: empty,
+    params: idParams,
+  })
+  .superRefine(({ body }, ctx) => {
+    refineStaffSchedule(body, ctx)
+  })
 
 export const staffIdParamsSchema = z.object({
   body: empty,

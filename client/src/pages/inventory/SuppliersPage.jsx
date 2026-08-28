@@ -4,6 +4,7 @@ import { SupplierFilters } from '@/components/feature/suppliers/SupplierFilters'
 import { SupplierFormDialog } from '@/components/feature/suppliers/SupplierFormDialog'
 import { SupplierTable } from '@/components/feature/suppliers/SupplierTable'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import { useSuppliers } from '@/hooks/useSuppliers'
@@ -28,6 +29,7 @@ export function SuppliersPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [formMode, setFormMode] = useState('create')
   const [editing, setEditing] = useState(null)
+  const [statusTarget, setStatusTarget] = useState(null)
   const [statusUpdatingId, setStatusUpdatingId] = useState(null)
 
   function openCreate() {
@@ -55,8 +57,8 @@ export function SuppliersPage() {
     return result
   }
 
-  async function handleStatusChange(row, isActive) {
-    if (!row?.id || row.isActive === isActive) return
+  async function applySupplierStatus(row, isActive) {
+    if (!row?.id) return
     setStatusUpdatingId(row.id)
     try {
       const result = await setSupplierActive(row.id, isActive)
@@ -65,6 +67,21 @@ export function SuppliersPage() {
     } finally {
       setStatusUpdatingId(null)
     }
+  }
+
+  function handleStatusChange(row, isActive) {
+    if (!row?.id || row.isActive === isActive) return
+    if (!isActive) {
+      setStatusTarget(row)
+      return
+    }
+    void applySupplierStatus(row, true)
+  }
+
+  async function handleConfirmDeactivate() {
+    if (!statusTarget?.id) return
+    await applySupplierStatus(statusTarget, false)
+    setStatusTarget(null)
   }
 
   return (
@@ -121,6 +138,22 @@ export function SuppliersPage() {
         initialSupplier={editing}
         loading={mutating}
         onSubmit={handleSubmit}
+      />
+
+      <ConfirmDialog
+        open={Boolean(statusTarget)}
+        onOpenChange={(open) => {
+          if (!open) setStatusTarget(null)
+        }}
+        title="Deactivate supplier?"
+        description={
+          statusTarget
+            ? `${statusTarget.companyName || 'This supplier'} will be hidden from new orders. Purchase history is kept.`
+            : undefined
+        }
+        confirmLabel="Deactivate"
+        loading={mutating}
+        onConfirm={handleConfirmDeactivate}
       />
     </div>
   )

@@ -88,6 +88,19 @@ export function peekProductCatalog() {
   return cache.data
 }
 
+/** Patch isActive on a cached category row without refetching the full catalog. */
+export function patchCatalogCategoryActive(id, isActive) {
+  if (!cache.data || !id) return
+  const patchRow = (row) => (row.id === id ? { ...row, isActive } : row)
+  cache.data.parents = (cache.data.parents || []).map(patchRow)
+  if (cache.data.childrenByParent instanceof Map) {
+    for (const [key, rows] of cache.data.childrenByParent.entries()) {
+      cache.data.childrenByParent.set(key, (rows || []).map(patchRow))
+    }
+  }
+  cache.data.all = (cache.data.all || []).map(patchRow)
+}
+
 export function invalidateProductCatalog() {
   cache = { data: null, fetchedAt: 0, inFlight: null }
 }

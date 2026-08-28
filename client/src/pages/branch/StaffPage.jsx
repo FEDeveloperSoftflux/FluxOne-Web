@@ -46,6 +46,7 @@ export function StaffPage() {
   const [formMode, setFormMode] = useState('create')
   const [editing, setEditing] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [statusTarget, setStatusTarget] = useState(null)
   const [statusUpdatingId, setStatusUpdatingId] = useState(null)
 
   function openCreate() {
@@ -73,16 +74,33 @@ export function StaffPage() {
     return result
   }
 
-  async function handleStatusChange(row, status) {
-    if (!row?.id || row.status === status) return
+  async function applyStaffStatus(row, status) {
+    if (!row?.id) return
     setStatusUpdatingId(row.id)
     try {
       const result = await setStaffStatus(row.id, status)
       if (!result.success) toastError(result.error || 'Status update failed')
-      else toastSuccess(status === 'inactive' || status === 'blocked' ? 'Staff deactivated' : 'Staff activated')
+      else toastSuccess(status === 'inactive' ? 'Staff deactivated' : 'Staff activated')
     } finally {
       setStatusUpdatingId(null)
     }
+  }
+
+  function handleStatusChange(row, nextActive) {
+    if (!row?.id) return
+    const currentlyActive = row.status === 'active' || row.status === 'open'
+    if (currentlyActive === nextActive) return
+    if (!nextActive) {
+      setStatusTarget(row)
+      return
+    }
+    void applyStaffStatus(row, 'active')
+  }
+
+  async function handleConfirmDeactivate() {
+    if (!statusTarget?.id) return
+    await applyStaffStatus(statusTarget, 'inactive')
+    setStatusTarget(null)
   }
 
   async function handleConfirmDelete() {
@@ -151,6 +169,22 @@ export function StaffPage() {
         initialStaff={editing}
         loading={mutating}
         onSubmit={handleSubmit}
+      />
+
+      <ConfirmDialog
+        open={Boolean(statusTarget)}
+        onOpenChange={(open) => {
+          if (!open) setStatusTarget(null)
+        }}
+        title="Deactivate staff?"
+        description={
+          statusTarget
+            ? `${statusTarget.fullName || statusTarget.email} will be blocked from logging in. You can reactivate them later.`
+            : undefined
+        }
+        confirmLabel="Deactivate"
+        loading={mutating}
+        onConfirm={handleConfirmDeactivate}
       />
 
       <ConfirmDialog

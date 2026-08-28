@@ -16,10 +16,12 @@ export async function findAuthUsersByLoginId(loginId) {
         u.is_active AS "isActive",
         r.slug AS role,
         t.slug AS "tenantSlug",
-        t.name AS "tenantName"
+        t.name AS "tenantName",
+        b.name AS "branchName"
       FROM users u
       JOIN roles r ON r.id = u.role_id
       JOIN tenants t ON t.id = u.tenant_id
+      LEFT JOIN branches b ON b.id = u.branch_id AND b.tenant_id = u.tenant_id
       WHERE lower(u.email) = lower($1)
         AND u.is_active = true
       ORDER BY u.created_at ASC
@@ -42,10 +44,12 @@ export async function findAuthUserById(id, tenantId) {
         u.is_active AS "isActive",
         r.slug AS role,
         t.slug AS "tenantSlug",
-        t.name AS "tenantName"
+        t.name AS "tenantName",
+        b.name AS "branchName"
       FROM users u
       JOIN roles r ON r.id = u.role_id
       JOIN tenants t ON t.id = u.tenant_id
+      LEFT JOIN branches b ON b.id = u.branch_id AND b.tenant_id = u.tenant_id
       WHERE u.id = $1
         AND u.tenant_id = $2
       LIMIT 1

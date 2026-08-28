@@ -94,11 +94,10 @@ export const deleteSupplier = createAsyncThunk(
 
 export const setSupplierActive = createAsyncThunk(
   'suppliers/setActive',
-  async ({ id, isActive }, { getState, dispatch, rejectWithValue }) => {
+  async ({ id, isActive }, { getState, rejectWithValue }) => {
     const result = await apiClient.patch(endpoints.suppliers.status(id), { isActive })
     if (!result.success) return rejectWithValue(result.error || 'Status update failed')
-    await dispatch(fetchSuppliers(getState().suppliers.filters))
-    return { success: true, data: mapSupplier(result.data) }
+    return { id, isActive, data: mapSupplier(result.data) }
   },
 )
 
@@ -162,8 +161,20 @@ const suppliersSlice = createSlice({
       .addCase(setSupplierActive.pending, (state) => {
         state.mutating = true
       })
-      .addCase(setSupplierActive.fulfilled, (state) => {
+      .addCase(setSupplierActive.fulfilled, (state, action) => {
         state.mutating = false
+        const { id, isActive, data } = action.payload
+        const activeFilter = state.filters.active
+        const shouldRemove =
+          (activeFilter === true && !isActive) || (activeFilter === false && isActive)
+        if (shouldRemove) {
+          state.items = state.items.filter((row) => row.id !== id)
+          if (state.pagination.total > 0) state.pagination.total -= 1
+        } else {
+          state.items = state.items.map((row) =>
+            row.id === id ? { ...row, ...(data || {}), isActive } : row,
+          )
+        }
       })
       .addCase(setSupplierActive.rejected, (state) => {
         state.mutating = false

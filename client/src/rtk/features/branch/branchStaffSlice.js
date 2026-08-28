@@ -15,6 +15,7 @@ export function buildStaffPayload(fields) {
     hardwareDeviceId,
     scheduleStart,
     scheduleBreakStart,
+    scheduleBreakEnd,
     scheduleEnd,
     image,
   } = fields
@@ -26,7 +27,7 @@ export function buildStaffPayload(fields) {
     hardwareDeviceId: hardwareDeviceId?.trim() || undefined,
     scheduleStart: scheduleStart || undefined,
     scheduleBreakStart: scheduleBreakStart || undefined,
-    scheduleBreakEnd: scheduleBreakStart || undefined,
+    scheduleBreakEnd: scheduleBreakEnd || undefined,
     scheduleEnd: scheduleEnd || undefined,
   }
 
@@ -199,7 +200,18 @@ const branchStaffSlice = createSlice({
       .addCase(setStaffStatus.fulfilled, (state, action) => {
         state.mutating = false
         const { id, data } = action.payload
-        state.items = state.items.map((row) => (row.id === id ? { ...row, ...data } : row))
+        const nextStatus = data?.status || 'active'
+        const isActive = nextStatus === 'active'
+        const statusFilter = state.filters.status
+        const shouldRemove =
+          (statusFilter === 'active' && !isActive) ||
+          (statusFilter === 'inactive' && isActive)
+        if (shouldRemove) {
+          state.items = state.items.filter((row) => row.id !== id)
+          if (state.pagination.total > 0) state.pagination.total -= 1
+        } else {
+          state.items = state.items.map((row) => (row.id === id ? { ...row, ...data } : row))
+        }
       })
       .addCase(setStaffStatus.rejected, (state) => {
         state.mutating = false

@@ -18,6 +18,7 @@ function publicUser(user) {
     tenantSlug: user.tenantSlug || null,
     tenantName: user.tenantName || null,
     branchId: user.branchId,
+    branchName: user.branchName || null,
   }
 }
 

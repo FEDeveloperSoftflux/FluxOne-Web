@@ -3,9 +3,44 @@ import { BrandLogo } from '@/components/shared/BrandLogo'
 import { MobileNav } from '@/layouts/Navbar/MobileNav'
 import { UserMenu } from '@/layouts/Navbar/UserMenu'
 import { useAuthSession } from '@/hooks/useAuthSession'
-import { BRAND } from '@/lib/constants'
-import { getNavItemsForRole } from '@/lib/nav'
+import { BRAND, ROLES } from '@/lib/constants'
+import { getNavItemsForRole, roleDisplayName } from '@/lib/nav'
 import { cn } from '@/lib/utils'
+
+function RoleContextBadge() {
+  const { user, role } = useAuthSession()
+
+  if (role === ROLES.INVENTORY_MANAGER && user?.branchName) {
+    return (
+      <span
+        className="hidden max-w-[14rem] truncate rounded-full px-2.5 py-1 text-xs font-semibold text-white sm:inline-block lg:max-w-xs"
+        style={{ background: BRAND.deep }}
+        title={`${user.branchName} · ${roleDisplayName(role)}`}
+      >
+        {user.branchName} · {roleDisplayName(role)}
+      </span>
+    )
+  }
+
+  if (role === ROLES.B2B_ADMIN) {
+    return (
+      <span className="hidden rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 sm:inline-block">
+        {user?.tenantName ? `${user.tenantName} · ` : ''}
+        {roleDisplayName(role)}
+      </span>
+    )
+  }
+
+  if (role === ROLES.BRANCH_MANAGER) {
+    return (
+      <span className="hidden max-w-[14rem] truncate rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 sm:inline-block lg:max-w-xs">
+        {user?.branchName || user?.tenantName || 'Branch'} · {roleDisplayName(role)}
+      </span>
+    )
+  }
+
+  return null
+}
 
 function DesktopNavLinks({ items }) {
   return (
@@ -55,6 +90,7 @@ export function AppTopNav({ className }) {
         <DesktopNavLinks items={items} />
         <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
           {/* <NotificationBell className="hidden sm:flex" /> */}
+          <RoleContextBadge />
           <UserMenu className="hidden md:block" />
           <MobileNav items={items} />
         </div>

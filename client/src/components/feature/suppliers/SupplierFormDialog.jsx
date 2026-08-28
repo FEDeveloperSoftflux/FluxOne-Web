@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
 import { BRAND } from '@/lib/constants'
+import { validateSupplierForm } from '@/lib/validation/supplierForm'
 
 const EMPTY = {
   companyName: '',
@@ -27,17 +28,9 @@ const EMPTY = {
   signature: null,
 }
 
-/**
- * Add / Edit supplier — fields align with tech lead + createSupplierSchema.
- */
-export function SupplierFormDialog({
-  open,
-  onOpenChange,
-  mode = 'create',
-  initialSupplier = null,
-  loading = false,
-  onSubmit,
-}) {
+// Add / Edit supplier — fields align with tech lead + createSupplierSchema.
+
+export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initialSupplier = null, loading = false, onSubmit }) {
   const isEdit = mode === 'edit'
   const [form, setForm] = useState(EMPTY)
   const [error, setError] = useState(null)
@@ -71,28 +64,12 @@ export function SupplierFormDialog({
   async function handleSubmit(event) {
     event.preventDefault()
     setError(null)
-    if (!form.companyName.trim()) {
-      setError('Company name is required')
-      return
-    }
-    if (!form.companyPhone.trim()) {
-      setError('Company contact number is required')
-      return
-    }
-    if (!form.representativeName.trim()) {
-      setError('Representative name is required')
-      return
-    }
-    if (!form.representativePhone.trim()) {
-      setError('Representative contact number is required')
+    const validationError = validateSupplierForm(form)
+    if (validationError) {
+      setError(validationError)
       return
     }
 
-    console.debug('[SupplierFormDialog] submit', {
-      mode,
-      companyName: form.companyName,
-      taxPaid: form.taxPaid,
-    })
     const result = await onSubmit?.(form)
     if (result?.success) onOpenChange?.(false)
     else if (result?.error) setError(result.error)
