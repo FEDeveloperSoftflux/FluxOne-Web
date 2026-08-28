@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -6,6 +6,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogCancelButton,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -16,6 +17,7 @@ import {
   parseProductsCsv,
   productCsvTemplate,
 } from '@/lib/productCsv'
+import { useFormBaseline } from '@/hooks/useFormBaseline'
 
 /**
  * Import products from CSV file or pasted text (same columns as Export).
@@ -25,6 +27,16 @@ export function ImportItemsDialog({ open, onOpenChange, loading = false, onSubmi
   const [error, setError] = useState(null)
   const [fileName, setFileName] = useState('')
   const fileRef = useRef(null)
+  const { captureBaseline, isDirty } = useFormBaseline(open)
+
+  useEffect(() => {
+    if (!open) return
+    setText('')
+    setFileName('')
+    setError(null)
+    if (fileRef.current) fileRef.current.value = ''
+    captureBaseline({ text: '', fileName: '' })
+  }, [open, captureBaseline])
 
   function handleFileChange(event) {
     const file = event.target.files?.[0]
@@ -65,7 +77,7 @@ export function ImportItemsDialog({ open, onOpenChange, loading = false, onSubmi
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} dirty={isDirty({ text, fileName })}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Import products (CSV)</DialogTitle>
@@ -123,14 +135,7 @@ export function ImportItemsDialog({ open, onOpenChange, loading = false, onSubmi
             />
           </div>
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              className="cursor-pointer"
-              onClick={() => onOpenChange?.(false)}
-            >
-              Cancel
-            </Button>
+            <DialogCancelButton className="cursor-pointer" />
             <Button
               type="submit"
               className="cursor-pointer text-white"

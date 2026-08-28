@@ -6,11 +6,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogCancelButton,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { BRAND } from '@/lib/constants'
+import { useFormBaseline } from '@/hooks/useFormBaseline'
 
 /**
  * Edit name + User ID (login) only.
@@ -26,13 +28,16 @@ export function ProfileEditDialog({
   const [name, setName] = useState('')
   const [loginId, setLoginId] = useState('')
   const [error, setError] = useState(null)
+  const { captureBaseline, isDirty } = useFormBaseline(open)
 
   useEffect(() => {
     if (!open) return
-    setName(initialName || '')
-    setLoginId(initialLoginId || '')
+    const snapshot = { name: initialName || '', loginId: initialLoginId || '' }
+    setName(snapshot.name)
+    setLoginId(snapshot.loginId)
     setError(null)
-  }, [open, initialName, initialLoginId])
+    captureBaseline(snapshot)
+  }, [open, initialName, initialLoginId, captureBaseline])
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -58,7 +63,7 @@ export function ProfileEditDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} dirty={isDirty({ name, loginId })}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Edit profile</DialogTitle>
@@ -97,15 +102,10 @@ export function ProfileEditDialog({
           ) : null}
 
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
+            <DialogCancelButton
               disabled={loading}
               className="w-full sm:w-auto"
-              onClick={() => onOpenChange?.(false)}
-            >
-              Cancel
-            </Button>
+            />
             <Button
               type="submit"
               disabled={loading}

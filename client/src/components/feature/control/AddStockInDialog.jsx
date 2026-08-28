@@ -7,6 +7,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogCancelButton,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +19,7 @@ import {
   fetchControlProductOptions,
   fetchControlSuppliers,
 } from '@/hooks/useInventoryControl'
+import { useFormBaseline } from '@/hooks/useFormBaseline'
 import { cn } from '@/lib/utils'
 
 const STEPS = [
@@ -53,6 +55,22 @@ export function AddStockInDialog({
   const [expiresAt, setExpiresAt] = useState('')
   const [error, setError] = useState(null)
   const [loadingOptions, setLoadingOptions] = useState(false)
+  const { captureBaseline, isDirty } = useFormBaseline(open)
+
+  const formSnapshot = useMemo(
+    () => ({
+      step,
+      categoryId,
+      subcategoryId,
+      productId,
+      supplierId,
+      scale,
+      quantity,
+      unitCost,
+      expiresAt,
+    }),
+    [step, categoryId, subcategoryId, productId, supplierId, scale, quantity, unitCost, expiresAt],
+  )
 
   const subs = useMemo(() => {
     if (!categoryId || !childrenByParent?.get) return []
@@ -71,17 +89,29 @@ export function AddStockInDialog({
 
   useEffect(() => {
     if (!open) return
-    setStep(1)
+    const snapshot = {
+      step: 1,
+      categoryId: '',
+      subcategoryId: '',
+      productId: '',
+      supplierId: '',
+      scale: 'unit',
+      quantity: '1',
+      unitCost: '',
+      expiresAt: '',
+    }
+    setStep(snapshot.step)
     setError(null)
-    setCategoryId('')
-    setSubcategoryId('')
-    setProductId('')
+    setCategoryId(snapshot.categoryId)
+    setSubcategoryId(snapshot.subcategoryId)
+    setProductId(snapshot.productId)
     setProducts([])
-    setSupplierId('')
-    setScale('unit')
-    setQuantity('1')
-    setUnitCost('')
-    setExpiresAt('')
+    setSupplierId(snapshot.supplierId)
+    setScale(snapshot.scale)
+    setQuantity(snapshot.quantity)
+    setUnitCost(snapshot.unitCost)
+    setExpiresAt(snapshot.expiresAt)
+    captureBaseline(snapshot)
     setLoadingOptions(true)
     void (async () => {
       const supRes = await fetchControlSuppliers()
@@ -160,7 +190,7 @@ export function AddStockInDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} dirty={isDirty(formSnapshot)}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Add New Stock</DialogTitle>
@@ -375,16 +405,11 @@ export function AddStockInDialog({
               Back
             </Button>
           ) : null}
-          <Button
-            type="button"
-            variant="outline"
+          <DialogCancelButton
             className="cursor-pointer"
             style={{ color: BRAND.purple, borderColor: BRAND.purple }}
             disabled={loading}
-            onClick={() => onOpenChange?.(false)}
-          >
-            Cancel
-          </Button>
+          />
           {step < 3 ? (
             <Button
               type="button"

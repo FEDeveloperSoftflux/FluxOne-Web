@@ -6,6 +6,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogCancelButton,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,6 +17,9 @@ import { BundleItemPicker } from '@/components/feature/products/BundleItemPicker
 import { TaxMultiSelect } from '@/components/feature/products/TaxMultiSelect'
 import { BRAND } from '@/lib/constants'
 import { PRODUCT_TYPES, SCALE_OPTIONS } from '@/lib/mapProduct'
+import { useFormBaseline } from '@/hooks/useFormBaseline'
+import { IMAGE_ACCEPT, imageUploadHint, validateImageFile } from '@/lib/imageUpload'
+import { toastError } from '@/lib/toast'
 
 const EMPTY = {
   name: '',
@@ -59,6 +63,8 @@ export function ItemFormDialog({
   const [error, setError] = useState(null)
   const [created, setCreated] = useState(null)
   const [imageWarning, setImageWarning] = useState(null)
+  const [imageError, setImageError] = useState(null)
+  const { captureBaseline, isDirty } = useFormBaseline(open)
 
   const type = isEdit ? form.type : productType
 
@@ -72,11 +78,12 @@ export function ItemFormDialog({
     if (!open) return
     setError(null)
     setImageWarning(null)
+    setImageError(null)
     setCreated(null)
     setStep('form')
     setConfirmed(false)
     if (isEdit && initialProduct) {
-      setForm({
+      const nextForm = {
         name: initialProduct.name || '',
         categoryId: initialProduct.categoryId || '',
         subcategoryId: initialProduct.subcategoryId || '',
@@ -93,14 +100,17 @@ export function ItemFormDialog({
           quantity: Number(row.quantity || 1),
         })),
         image: null,
-      })
+      }
+      setForm(nextForm)
+      captureBaseline(nextForm)
     } else {
-      setForm({
+      const nextForm = {
         ...EMPTY,
         type: productType,
-        // Prefer first loaded category; stay empty until catalog arrives
         categoryId: categories[0]?.id || '',
-      })
+      }
+      setForm(nextForm)
+      captureBaseline(nextForm)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- categories seeded in separate effect
   }, [open, isEdit, initialProduct, productType])
@@ -136,8 +146,21 @@ export function ItemFormDialog({
     if (form.sellingPrice === '' || Number(form.sellingPrice) < 0) {
       return 'Selling price is required'
     }
-    if (type === PRODUCT_TYPES.BUNDLE && (!form.bundleItems || form.bundleItems.length === 0)) {
-      return 'Add at least one bundle item'
+    if (type === PRODUCT_TYPES.BUNDLE) {
+      if (!form.bundleItems || form.bundleItems.length === 0) {
+        return 'Add at least one bundle item'
+      }
+      const itemIds = []
+      for (const row of form.bundleItems) {
+        if (!row.itemId) return 'Select an item for each bundle line'
+        if (!row.quantity || Number(row.quantity) <= 0) {
+          return 'Quantity must be greater than 0 for each bundle line'
+        }
+        itemIds.push(row.itemId)
+      }
+      if (new Set(itemIds).size !== itemIds.length) {
+        return 'Each item can only appear once in a bundle'
+      }
     }
     return null
   }
@@ -209,8 +232,11 @@ export function ItemFormDialog({
         ? 'Add bundle'
         : 'Add single item'
 
+  const dirty =
+    step === 'success' ? false : isDirty(form) || step === 'confirm' || Boolean(confirmed)
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} dirty={dirty}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
@@ -327,9 +353,24 @@ export function ItemFormDialog({
                 <Input
                   id="product-image"
                   type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={(event) => patch('image', event.target.files?.[0] || null)}
+                  accept={IMAGE_ACCEPT}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] || null
+                    const validationError = validateImageFile(file)
+                    setImageError(validationError)
+                    if (validationError) {
+                      toastError(validationError)
+                      event.target.value = ''
+                      patch('image', null)
+                      return
+                    }
+                    patch('image', file)
+                  }}
                 />
+                <p className="text-[11px] text-slate-400">{imageUploadHint()}</p>
+                {imageError ? (
+                  <p className="text-xs text-red-600">{imageError}</p>
+                ) : null}
               </div>
 
               <div className="space-y-1.5 sm:col-span-2">
@@ -430,14 +471,7 @@ export function ItemFormDialog({
             </div>
 
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                className="cursor-pointer"
-                onClick={() => onOpenChange?.(false)}
-              >
-                Cancel
-              </Button>
+              <DialogCancelButton className="cursor-pointer" />
               <Button
                 type="submit"
                 className="cursor-pointer text-white"

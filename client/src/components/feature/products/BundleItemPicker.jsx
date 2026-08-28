@@ -18,10 +18,16 @@ export function BundleItemPicker({
     (item) => item.id !== excludeId && item.type !== 'bundle',
   )
 
+  const usedItemIds = new Set(value.map((row) => row.itemId).filter(Boolean))
+
+  function optionsForRow(rowIndex) {
+    const currentId = value[rowIndex]?.itemId
+    return options.filter((item) => item.id === currentId || !usedItemIds.has(item.id))
+  }
+
   function addRow() {
-    const first = options[0]
-    if (!first) return
-    onChange?.([...value, { itemId: first.id, quantity: 1 }])
+    if (!options.length) return
+    onChange?.([...value, { itemId: '', quantity: 1 }])
   }
 
   function patch(index, field, nextValue) {
@@ -39,7 +45,14 @@ export function BundleItemPicker({
     <div className={className}>
       <div className="mb-2 flex items-center justify-between gap-2">
         <Label>Bundle items</Label>
-        <Button type="button" size="sm" variant="outline" className="cursor-pointer" onClick={addRow}>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="cursor-pointer"
+          onClick={addRow}
+          disabled={!options.length || usedItemIds.size >= options.length}
+        >
           <Plus className="size-3.5" />
           Add item
         </Button>
@@ -53,13 +66,14 @@ export function BundleItemPicker({
 
       <div className="space-y-2">
         {value.map((row, index) => (
-          <div key={`${row.itemId}-${index}`} className="flex items-end gap-2">
+          <div key={`bundle-row-${index}`} className="flex items-end gap-2">
             <div className="min-w-0 flex-1 space-y-1">
               <NativeSelect
                 value={row.itemId || ''}
                 onChange={(event) => patch(index, 'itemId', event.target.value)}
               >
-                {options.map((item) => (
+                <option value="">Select item…</option>
+                {optionsForRow(index).map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name} ({item.itemCode})
                   </option>

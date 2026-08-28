@@ -20,6 +20,7 @@ function fileFilter(_req, file, cb) {
 
 function storage() {
   if (isCloudinaryConfigured()) {
+    // Render/production: Cloudinary API key must have Upload/Create permission.
     return new CloudinaryStorage({
       cloudinary,
       params: {

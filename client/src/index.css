@@ -64,6 +64,17 @@ body {
   @apply bg-background text-foreground antialiased;
 }
 
+/* Hide scrollbars site-wide while keeping scroll behavior */
+html,
+body,
+* {
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+}
+
 @keyframes skeleton-shimmer {
   0% {
     background-position: 200% 0;

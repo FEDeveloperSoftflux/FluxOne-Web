@@ -6,11 +6,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogCancelButton,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { BRAND } from '@/lib/constants'
+import { useFormBaseline } from '@/hooks/useFormBaseline'
+import { IMAGE_ACCEPT, imageUploadHint, validateImageFile } from '@/lib/imageUpload'
+import { toastError } from '@/lib/toast'
 
 export function CategoryDialog({
   open,
@@ -25,13 +29,18 @@ export function CategoryDialog({
   const [name, setName] = useState('')
   const [image, setImage] = useState(null)
   const [error, setError] = useState(null)
+  const [imageError, setImageError] = useState(null)
+  const { captureBaseline, isDirty } = useFormBaseline(open)
 
   useEffect(() => {
     if (!open) return
     setError(null)
+    setImageError(null)
+    const snapshot = { name: initial?.name || '', image: null }
     setImage(null)
-    setName(initial?.name || '')
-  }, [open, initial])
+    setName(snapshot.name)
+    captureBaseline(snapshot)
+  }, [open, initial, captureBaseline])
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -45,7 +54,7 @@ export function CategoryDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} dirty={isDirty({ name, image })}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>
@@ -73,19 +82,25 @@ export function CategoryDialog({
             <Input
               id="category-image"
               type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={(event) => setImage(event.target.files?.[0] || null)}
+              accept={IMAGE_ACCEPT}
+              onChange={(event) => {
+                const file = event.target.files?.[0] || null
+                const validationError = validateImageFile(file)
+                setImageError(validationError)
+                if (validationError) {
+                  toastError(validationError)
+                  event.target.value = ''
+                  setImage(null)
+                  return
+                }
+                setImage(file)
+              }}
             />
+            <p className="text-[11px] text-slate-400">{imageUploadHint()}</p>
+            {imageError ? <p className="text-xs text-red-600">{imageError}</p> : null}
           </div>
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              className="cursor-pointer"
-              onClick={() => onOpenChange?.(false)}
-            >
-              Cancel
-            </Button>
+            <DialogCancelButton className="cursor-pointer" />
             <Button
               type="submit"
               className="cursor-pointer text-white"

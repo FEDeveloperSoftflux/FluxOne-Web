@@ -6,6 +6,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogCancelButton,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,6 +14,9 @@ import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
 import { BRAND } from '@/lib/constants'
 import { validateStaffForm } from '@/lib/validation/staffSchedule'
+import { useFormBaseline } from '@/hooks/useFormBaseline'
+import { IMAGE_ACCEPT, imageUploadHint, validateImageFile } from '@/lib/imageUpload'
+import { toastError } from '@/lib/toast'
 
 const EMPTY_FORM = {
   email: '',
@@ -48,12 +52,15 @@ export function StaffFormDialog({
   const isEdit = mode === 'edit'
   const [form, setForm] = useState(EMPTY_FORM)
   const [error, setError] = useState(null)
+  const [imageError, setImageError] = useState(null)
+  const { captureBaseline, isDirty } = useFormBaseline(open)
 
   useEffect(() => {
     if (!open) return
     setError(null)
+    setImageError(null)
     if (isEdit && initialStaff) {
-      setForm({
+      const nextForm = {
         email: initialStaff.email || '',
         password: '',
         fullName: initialStaff.fullName || '',
@@ -77,9 +84,12 @@ export function StaffFormDialog({
         scheduleBreakEnd: timeInputValue(initialStaff.scheduleBreakEnd),
         scheduleEnd: timeInputValue(initialStaff.scheduleEnd),
         image: null,
-      })
+      }
+      setForm(nextForm)
+      captureBaseline(nextForm)
     } else {
       setForm(EMPTY_FORM)
+      captureBaseline(EMPTY_FORM)
     }
   }, [open, isEdit, initialStaff])
 
@@ -106,7 +116,7 @@ export function StaffFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} dirty={isDirty(form)}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit Staff' : 'Add Staff'}</DialogTitle>
@@ -224,9 +234,22 @@ export function StaffFormDialog({
               <Input
                 id="staff-image"
                 type="file"
-                accept="image/*"
-                onChange={(e) => patch('image', e.target.files?.[0] || null)}
+                accept={IMAGE_ACCEPT}
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null
+                  const validationError = validateImageFile(file)
+                  setImageError(validationError)
+                  if (validationError) {
+                    toastError(validationError)
+                    e.target.value = ''
+                    patch('image', null)
+                    return
+                  }
+                  patch('image', file)
+                }}
               />
+              <p className="text-[11px] text-slate-400">{imageUploadHint()}</p>
+              {imageError ? <p className="text-xs text-red-600">{imageError}</p> : null}
             </div>
           </div>
 
@@ -237,15 +260,10 @@ export function StaffFormDialog({
           ) : null}
 
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
+            <DialogCancelButton
               disabled={loading}
               className="w-full sm:w-auto"
-              onClick={() => onOpenChange?.(false)}
-            >
-              Cancel
-            </Button>
+            />
             <Button
               type="submit"
               disabled={loading}

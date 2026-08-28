@@ -6,6 +6,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogCancelButton,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,6 +14,9 @@ import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
 import { BRAND } from '@/lib/constants'
 import { validateSupplierForm } from '@/lib/validation/supplierForm'
+import { useFormBaseline } from '@/hooks/useFormBaseline'
+import { IMAGE_ACCEPT, imageUploadHint, validateImageFile } from '@/lib/imageUpload'
+import { toastError } from '@/lib/toast'
 
 const EMPTY = {
   companyName: '',
@@ -34,12 +38,30 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
   const isEdit = mode === 'edit'
   const [form, setForm] = useState(EMPTY)
   const [error, setError] = useState(null)
+  const [imageError, setImageError] = useState(null)
+  const [signatureError, setSignatureError] = useState(null)
+  const { captureBaseline, isDirty } = useFormBaseline(open)
+
+  function handleImageField(field, file, event) {
+    const validationError = validateImageFile(file)
+    if (field === 'image') setImageError(validationError)
+    else setSignatureError(validationError)
+    if (validationError) {
+      toastError(validationError)
+      event.target.value = ''
+      patch(field, null)
+      return
+    }
+    patch(field, file)
+  }
 
   useEffect(() => {
     if (!open) return
     setError(null)
+    setImageError(null)
+    setSignatureError(null)
     if (isEdit && initialSupplier) {
-      setForm({
+      const nextForm = {
         companyName: initialSupplier.companyName || '',
         companyPhone: initialSupplier.companyPhone || '',
         representativeName: initialSupplier.representativeName || '',
@@ -51,9 +73,12 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
         bankAccountNumber: initialSupplier.bankAccountNumber || '',
         image: null,
         signature: null,
-      })
+      }
+      setForm(nextForm)
+      captureBaseline(nextForm)
     } else {
       setForm(EMPTY)
+      captureBaseline(EMPTY)
     }
   }, [open, isEdit, initialSupplier])
 
@@ -76,7 +101,7 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} dirty={isDirty(form)}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit supplier' : 'Add supplier'}</DialogTitle>
@@ -106,9 +131,11 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
               <Input
                 id="sup-image"
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={(e) => patch('image', e.target.files?.[0] || null)}
+                accept={IMAGE_ACCEPT}
+                onChange={(e) => handleImageField('image', e.target.files?.[0] || null, e)}
               />
+              <p className="text-[11px] text-slate-400">{imageUploadHint()}</p>
+              {imageError ? <p className="text-xs text-red-600">{imageError}</p> : null}
             </div>
 
             <div className="space-y-1.5">
@@ -193,21 +220,15 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
               <Input
                 id="sup-signature"
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={(e) => patch('signature', e.target.files?.[0] || null)}
+                accept={IMAGE_ACCEPT}
+                onChange={(e) => handleImageField('signature', e.target.files?.[0] || null, e)}
               />
+              {signatureError ? <p className="text-xs text-red-600">{signatureError}</p> : null}
             </div>
           </div>
 
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              className="cursor-pointer"
-              onClick={() => onOpenChange?.(false)}
-            >
-              Cancel
-            </Button>
+            <DialogCancelButton className="cursor-pointer" />
             <Button
               type="submit"
               className="cursor-pointer text-white"

@@ -7,6 +7,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogCancelButton,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,6 +16,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/select'
 import { BRAND } from '@/lib/constants'
 import { money } from '@/lib/mapProduct'
+import { useFormBaseline } from '@/hooks/useFormBaseline'
 
 /**
  * Generate PO: pick supplier, multi products with qty + unit cost (shows last purchase).
@@ -31,6 +33,7 @@ export function GenerateOrderDialog({
   const [lines, setLines] = useState([])
   const [explanation, setExplanation] = useState('')
   const [error, setError] = useState(null)
+  const { captureBaseline, isDirty } = useFormBaseline(open)
 
   const selectedSupplier = useMemo(
     () => suppliers.find((s) => s.id === supplierId) || null,
@@ -41,8 +44,14 @@ export function GenerateOrderDialog({
     if (!open) return
     setError(null)
     setExplanation('')
-    setSupplierId(suppliers[0]?.id || '')
-    setLines([])
+    const snapshot = {
+      supplierId: suppliers[0]?.id || '',
+      lines: [],
+      explanation: '',
+    }
+    setSupplierId(snapshot.supplierId)
+    setLines(snapshot.lines)
+    captureBaseline(snapshot)
   }, [open, suppliers])
 
   function addLine() {
@@ -115,7 +124,7 @@ export function GenerateOrderDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} dirty={isDirty({ supplierId, lines, explanation })}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Generate order</DialogTitle>
@@ -243,14 +252,7 @@ export function GenerateOrderDialog({
         </div>
 
         <DialogFooter className="flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            className="cursor-pointer"
-            onClick={() => onOpenChange?.(false)}
-          >
-            Cancel
-          </Button>
+          <DialogCancelButton className="cursor-pointer" />
           <Button
             type="button"
             variant="outline"

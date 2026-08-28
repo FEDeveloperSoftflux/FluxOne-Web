@@ -6,6 +6,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogCancelButton,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,6 +20,7 @@ import {
   fetchControlProductOptions,
   fetchEmployeeLookups,
 } from '@/hooks/useInventoryControl'
+import { useFormBaseline } from '@/hooks/useFormBaseline'
 
 // Create / edit damaged item (employee + location + reason required).
 export function DamagedDialog({
@@ -45,6 +47,30 @@ export function DamagedDialog({
   const [damagedLocation, setDamagedLocation] = useState('warehouse')
   const [reason, setReason] = useState('')
   const [error, setError] = useState(null)
+  const { captureBaseline, isDirty } = useFormBaseline(open)
+
+  const formSnapshot = useMemo(
+    () => ({
+      categoryId,
+      subcategoryId,
+      productId,
+      scale,
+      quantity,
+      damagedByUserId,
+      damagedLocation,
+      reason,
+    }),
+    [
+      categoryId,
+      subcategoryId,
+      productId,
+      scale,
+      quantity,
+      damagedByUserId,
+      damagedLocation,
+      reason,
+    ],
+  )
 
   const subs = useMemo(() => {
     if (!categoryId || !childrenByParent?.get) return []
@@ -59,22 +85,44 @@ export function DamagedDialog({
       else setEmployees([])
     })
     if (isEdit && initial) {
-      setProductId(initial.productId || '')
-      setScale(initial.scale || 'unit')
-      setQuantity(String(Math.abs(Number(initial.quantity ?? 1))))
-      setDamagedByUserId(initial.damagedByUserId || '')
-      setDamagedLocation(initial.damagedLocation || 'warehouse')
-      setReason(initial.reason || '')
+      const snapshot = {
+        categoryId: '',
+        subcategoryId: '',
+        productId: initial.productId || '',
+        scale: initial.scale || 'unit',
+        quantity: String(Math.abs(Number(initial.quantity ?? 1))),
+        damagedByUserId: initial.damagedByUserId || '',
+        damagedLocation: initial.damagedLocation || 'warehouse',
+        reason: initial.reason || '',
+      }
+      setProductId(snapshot.productId)
+      setScale(snapshot.scale)
+      setQuantity(snapshot.quantity)
+      setDamagedByUserId(snapshot.damagedByUserId)
+      setDamagedLocation(snapshot.damagedLocation)
+      setReason(snapshot.reason)
+      captureBaseline(snapshot)
       return
     }
-    setCategoryId('')
-    setSubcategoryId('')
-    setQuantity('1')
-    setDamagedLocation('warehouse')
-    setReason('')
-    setDamagedByUserId('')
-    setProductId('')
+    const snapshot = {
+      categoryId: '',
+      subcategoryId: '',
+      productId: '',
+      scale: 'unit',
+      quantity: '1',
+      damagedByUserId: '',
+      damagedLocation: 'warehouse',
+      reason: '',
+    }
+    setCategoryId(snapshot.categoryId)
+    setSubcategoryId(snapshot.subcategoryId)
+    setQuantity(snapshot.quantity)
+    setDamagedLocation(snapshot.damagedLocation)
+    setReason(snapshot.reason)
+    setDamagedByUserId(snapshot.damagedByUserId)
+    setProductId(snapshot.productId)
     setProducts([])
+    captureBaseline(snapshot)
   }, [open, isEdit, initial])
 
   useEffect(() => {
@@ -137,7 +185,7 @@ export function DamagedDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} dirty={isDirty(formSnapshot)}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit damaged item' : 'Add damaged item'}</DialogTitle>
@@ -279,9 +327,7 @@ export function DamagedDialog({
         ) : null}
 
         <DialogFooter>
-          <Button type="button" variant="outline" disabled={loading} onClick={() => onOpenChange?.(false)}>
-            Cancel
-          </Button>
+          <DialogCancelButton disabled={loading} />
           <Button
             type="button"
             className="text-white"

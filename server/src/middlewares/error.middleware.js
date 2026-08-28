@@ -1,3 +1,4 @@
+import multer from 'multer'
 import { error } from '../utils/response.util.js'
 
 export function asyncHandler(fn) {
@@ -6,7 +7,47 @@ export function asyncHandler(fn) {
   }
 }
 
+function mapUploadError(err) {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return { status: 413, message: 'Image must be under 4 MB (JPEG, PNG, or WebP)' }
+    }
+    if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+      return { status: 400, message: 'Unexpected file field in upload' }
+    }
+    return { status: 400, message: err.message || 'Invalid file upload' }
+  }
+
+  if (err.message === 'Only JPEG, PNG, or WebP images are allowed') {
+    return { status: 400, message: err.message }
+  }
+
+  const message = String(err.message || '')
+  const storageErrors = Array.isArray(err.storageErrors) ? err.storageErrors : []
+
+  if (
+    storageErrors.length > 0 ||
+    message.includes('Missing required parameter') ||
+    message.includes('cloudinary') ||
+    message.includes('Cloudinary') ||
+    err.name === 'StorageError'
+  ) {
+    return {
+      status: 502,
+      message:
+        'Image upload failed. Ensure Cloudinary is configured with Upload/Create permission on the server.',
+    }
+  }
+
+  return null
+}
+
 export function errorMiddleware(err, _req, res, _next) {
+  const uploadError = mapUploadError(err)
+  if (uploadError) {
+    return error(res, uploadError.message, uploadError.status)
+  }
+
   const status = err.status || err.statusCode || 500
   const isProd = process.env.NODE_ENV === 'production'
   const message = status >= 500 && isProd ? 'Internal server error' : err.message || 'Internal server error'

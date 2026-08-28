@@ -6,6 +6,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogCancelButton,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,6 +16,7 @@ import { NativeSelect } from '@/components/ui/select'
 import { BRAND } from '@/lib/constants'
 import { SCALE_OPTIONS } from '@/lib/mapProduct'
 import { fetchControlProductOptions } from '@/hooks/useInventoryControl'
+import { useFormBaseline } from '@/hooks/useFormBaseline'
 
 // Stock-out create dialog.
 
@@ -36,6 +38,12 @@ export function StockOutDialog({
   const [quantity, setQuantity] = useState('1')
   const [reason, setReason] = useState('')
   const [error, setError] = useState(null)
+  const { captureBaseline, isDirty } = useFormBaseline(open)
+
+  const formSnapshot = useMemo(
+    () => ({ categoryId, subcategoryId, productId, scale, quantity, reason }),
+    [categoryId, subcategoryId, productId, scale, quantity, reason],
+  )
 
   const subs = useMemo(() => {
     if (!categoryId || !childrenByParent?.get) return []
@@ -45,12 +53,21 @@ export function StockOutDialog({
   useEffect(() => {
     if (!open) return
     setError(null)
-    setCategoryId('')
-    setSubcategoryId('')
-    setQuantity('1')
-    setReason('')
-    setProductId('')
+    const snapshot = {
+      categoryId: '',
+      subcategoryId: '',
+      productId: '',
+      scale: 'unit',
+      quantity: '1',
+      reason: '',
+    }
+    setCategoryId(snapshot.categoryId)
+    setSubcategoryId(snapshot.subcategoryId)
+    setQuantity(snapshot.quantity)
+    setReason(snapshot.reason)
+    setProductId(snapshot.productId)
     setProducts([])
+    captureBaseline(snapshot)
   }, [open])
 
   useEffect(() => {
@@ -63,10 +80,7 @@ export function StockOutDialog({
     }).then((res) => {
       if (cancelled || !res.success) return
       setProducts(res.items)
-      if (res.items[0]) {
-        setProductId(res.items[0].id)
-        setScale(res.items[0].scale || 'unit')
-      } else setProductId('')
+      setProductId((prev) => (res.items.some((p) => p.id === prev) ? prev : ''))
     })
     return () => {
       cancelled = true
@@ -95,7 +109,7 @@ export function StockOutDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} dirty={isDirty(formSnapshot)}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Add stock out</DialogTitle>
@@ -186,9 +200,7 @@ export function StockOutDialog({
         ) : null}
 
         <DialogFooter>
-          <Button type="button" variant="outline" disabled={loading} onClick={() => onOpenChange?.(false)}>
-            Cancel
-          </Button>
+          <DialogCancelButton disabled={loading} />
           <Button
             type="button"
             className="text-white"

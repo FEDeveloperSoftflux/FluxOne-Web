@@ -6,6 +6,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogCancelButton,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +19,7 @@ import {
   fetchControlProductOptions,
   fetchControlSuppliers,
 } from '@/hooks/useInventoryControl'
+import { useFormBaseline } from '@/hooks/useFormBaseline'
 
 function toDateInput(value) {
   if (!value) return ''
@@ -58,6 +60,21 @@ export function ExpiredDialog({
   const [supplierId, setSupplierId] = useState('')
   const [reason, setReason] = useState('')
   const [error, setError] = useState(null)
+  const { captureBaseline, isDirty } = useFormBaseline(open)
+
+  const formSnapshot = useMemo(
+    () => ({
+      categoryId,
+      subcategoryId,
+      productId,
+      scale,
+      quantity,
+      expiresAt,
+      supplierId,
+      reason,
+    }),
+    [categoryId, subcategoryId, productId, scale, quantity, expiresAt, supplierId, reason],
+  )
 
   const subs = useMemo(() => {
     if (!categoryId || !childrenByParent?.get) return []
@@ -71,22 +88,44 @@ export function ExpiredDialog({
       if (res.success) setSuppliers(res.items)
     })
     if (isEdit && initial) {
-      setProductId(initial.productId || '')
-      setScale(initial.scale || 'unit')
-      setQuantity(String(Math.abs(Number(initial.quantity ?? 1))))
-      setExpiresAt(toDateInput(initial.expiresAt))
-      setSupplierId(initial.supplierId || '')
-      setReason(initial.reason || '')
+      const snapshot = {
+        categoryId: '',
+        subcategoryId: '',
+        productId: initial.productId || '',
+        scale: initial.scale || 'unit',
+        quantity: String(Math.abs(Number(initial.quantity ?? 1))),
+        expiresAt: toDateInput(initial.expiresAt),
+        supplierId: initial.supplierId || '',
+        reason: initial.reason || '',
+      }
+      setProductId(snapshot.productId)
+      setScale(snapshot.scale)
+      setQuantity(snapshot.quantity)
+      setExpiresAt(snapshot.expiresAt)
+      setSupplierId(snapshot.supplierId)
+      setReason(snapshot.reason)
+      captureBaseline(snapshot)
       return
     }
-    setCategoryId('')
-    setSubcategoryId('')
-    setQuantity('1')
-    setExpiresAt('')
-    setSupplierId('')
-    setReason('')
-    setProductId('')
+    const snapshot = {
+      categoryId: '',
+      subcategoryId: '',
+      productId: '',
+      scale: 'unit',
+      quantity: '1',
+      expiresAt: '',
+      supplierId: '',
+      reason: '',
+    }
+    setCategoryId(snapshot.categoryId)
+    setSubcategoryId(snapshot.subcategoryId)
+    setQuantity(snapshot.quantity)
+    setExpiresAt(snapshot.expiresAt)
+    setSupplierId(snapshot.supplierId)
+    setReason(snapshot.reason)
+    setProductId(snapshot.productId)
     setProducts([])
+    captureBaseline(snapshot)
   }, [open, isEdit, initial])
 
   useEffect(() => {
@@ -144,7 +183,7 @@ export function ExpiredDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} dirty={isDirty(formSnapshot)}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit expired item' : 'Add expired product'}</DialogTitle>
@@ -264,9 +303,7 @@ export function ExpiredDialog({
         ) : null}
 
         <DialogFooter>
-          <Button type="button" variant="outline" disabled={loading} onClick={() => onOpenChange?.(false)}>
-            Cancel
-          </Button>
+          <DialogCancelButton disabled={loading} />
           <Button
             type="button"
             className="text-white"

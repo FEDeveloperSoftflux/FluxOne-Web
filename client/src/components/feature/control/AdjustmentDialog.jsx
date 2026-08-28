@@ -6,6 +6,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogCancelButton,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,6 +16,7 @@ import { NativeSelect } from '@/components/ui/select'
 import { BRAND } from '@/lib/constants'
 import { SCALE_OPTIONS } from '@/lib/mapProduct'
 import { fetchControlProductOptions } from '@/hooks/useInventoryControl'
+import { useFormBaseline } from '@/hooks/useFormBaseline'
 
 // Create / edit stock adjustment (reason required).
 export function AdjustmentDialog({
@@ -38,6 +40,19 @@ export function AdjustmentDialog({
   const [quantity, setQuantity] = useState('1')
   const [reason, setReason] = useState('')
   const [error, setError] = useState(null)
+  const { captureBaseline, isDirty } = useFormBaseline(open)
+
+  const formSnapshot = useMemo(
+    () => ({
+      categoryId,
+      subcategoryId,
+      productId,
+      scale,
+      quantity,
+      reason,
+    }),
+    [categoryId, subcategoryId, productId, scale, quantity, reason],
+  )
 
   const subs = useMemo(() => {
     if (!categoryId || !childrenByParent?.get) return []
@@ -48,22 +63,40 @@ export function AdjustmentDialog({
     if (!open) return
     setError(null)
     if (isEdit && initial) {
-      setProductId(initial.productId || '')
-      setScale(initial.scale || 'unit')
-      setQuantity(String(initial.quantity ?? 1))
-      setReason(initial.reason || '')
+      const snapshot = {
+        categoryId: '',
+        subcategoryId: '',
+        productId: initial.productId || '',
+        scale: initial.scale || 'unit',
+        quantity: String(initial.quantity ?? 1),
+        reason: initial.reason || '',
+      }
+      setProductId(snapshot.productId)
+      setScale(snapshot.scale)
+      setQuantity(snapshot.quantity)
+      setReason(snapshot.reason)
       setCategoryId('')
       setSubcategoryId('')
       setProducts([])
+      captureBaseline(snapshot)
       return
     }
-    setCategoryId('')
-    setSubcategoryId('')
-    setProductId('')
-    setScale('unit')
-    setQuantity('1')
-    setReason('')
+    const snapshot = {
+      categoryId: '',
+      subcategoryId: '',
+      productId: '',
+      scale: 'unit',
+      quantity: '1',
+      reason: '',
+    }
+    setCategoryId(snapshot.categoryId)
+    setSubcategoryId(snapshot.subcategoryId)
+    setProductId(snapshot.productId)
+    setScale(snapshot.scale)
+    setQuantity(snapshot.quantity)
+    setReason(snapshot.reason)
     setProducts([])
+    captureBaseline(snapshot)
   }, [open, isEdit, initial])
 
   useEffect(() => {
@@ -115,7 +148,7 @@ export function AdjustmentDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} dirty={isDirty(formSnapshot)}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit adjustment' : 'Add adjustment'}</DialogTitle>
@@ -228,9 +261,7 @@ export function AdjustmentDialog({
         ) : null}
 
         <DialogFooter>
-          <Button type="button" variant="outline" disabled={loading} onClick={() => onOpenChange?.(false)}>
-            Cancel
-          </Button>
+          <DialogCancelButton disabled={loading} />
           <Button
             type="button"
             className="text-white"
