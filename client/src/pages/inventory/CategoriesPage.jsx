@@ -7,10 +7,43 @@ import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
+import { NativeSelect } from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { useProducts } from '@/hooks/useProducts'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
+
+function filterCategoryRows(catalog, statusFilter) {
+  const allRows = (catalog.parents || []).map((parent) => ({
+    parent,
+    children: catalog.childrenByParent.get(parent.id) || [],
+  }))
+
+  if (statusFilter === 'all') return allRows
+
+  if (statusFilter === 'active') {
+    return allRows
+      .filter(({ parent }) => parent.isActive !== false)
+      .map(({ parent, children }) => ({
+        parent,
+        children: children.filter((child) => child.isActive !== false),
+      }))
+  }
+
+  return allRows
+    .map(({ parent, children }) => {
+      const inactiveChildren = children.filter((child) => child.isActive === false)
+      if (parent.isActive === false) {
+        return { parent, children: inactiveChildren }
+      }
+      if (inactiveChildren.length > 0) {
+        return { parent, children: inactiveChildren }
+      }
+      return null
+    })
+    .filter(Boolean)
+}
 
 export function CategoriesPage() {
   const {
@@ -20,8 +53,9 @@ export function CategoriesPage() {
     createCategory,
     updateCategory,
     setCategoryActive,
-    loadCatalog,
   } = useProducts({}, { skipList: true })
+
+  const [statusFilter, setStatusFilter] = useState('all')
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogMode, setDialogMode] = useState('create')
@@ -31,12 +65,7 @@ export function CategoriesPage() {
   const [deactivateTarget, setDeactivateTarget] = useState(null)
   const [statusUpdatingId, setStatusUpdatingId] = useState(null)
 
-  const rows = useMemo(() => {
-    return catalog.parents.map((parent) => ({
-      parent,
-      children: catalog.childrenByParent.get(parent.id) || [],
-    }))
-  }, [catalog])
+  const rows = useMemo(() => filterCategoryRows(catalog, statusFilter), [catalog, statusFilter])
 
   function openCreateCategory() {
     setDialogKind('category')
@@ -133,15 +162,22 @@ export function CategoriesPage() {
           title="Categories"
           description="Deactivate instead of delete — products stay active and show Category as N/A"
           actions={
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="cursor-pointer"
-                onClick={() => loadCatalog({ force: true })}
-              >
-                Refresh
-              </Button>
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="category-status-filter" className="sr-only">
+                  Status
+                </Label>
+                <NativeSelect
+                  id="category-status-filter"
+                  value={statusFilter}
+                  className="min-w-[8.5rem]"
+                  onChange={(event) => setStatusFilter(event.target.value)}
+                >
+                  <option value="all">All</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </NativeSelect>
+              </div>
               <Button
                 type="button"
                 className="cursor-pointer text-white"
@@ -162,8 +198,9 @@ export function CategoriesPage() {
           description="Parent categories and sub categories"
           actions={
             <span className="text-xs text-slate-400">
-              {catalog.parents.length} parent
-              {catalog.parents.length === 1 ? '' : 's'}
+              {rows.length} parent
+              {rows.length === 1 ? '' : 's'}
+              {statusFilter !== 'all' ? ` · ${statusFilter}` : ''}
             </span>
           }
         >
@@ -172,7 +209,13 @@ export function CategoriesPage() {
           ) : !rows.length ? (
             <div className="flex flex-col items-center gap-2 py-10 text-center text-sm text-slate-500">
               <FolderTree className="size-8 text-slate-300" />
-              <p>No categories yet. Create a parent category first.</p>
+              <p>
+                {statusFilter === 'all'
+                  ? 'No categories yet. Create a parent category first.'
+                  : statusFilter === 'active'
+                    ? 'No active categories.'
+                    : 'No inactive categories.'}
+              </p>
             </div>
           ) : (
             <ul className="space-y-3">

@@ -1,7 +1,7 @@
 // useInventoryControl — RTK control slice wrapper (Express → RTK → hook → UI)
 import { useCallback, useEffect, useMemo } from 'react'
 import { useAppDispatch, useAppSelector } from '@/rtk/hooks'
-import { asResult, catalogForUi } from '@/rtk/asResult'
+import { asResult, catalogActiveOnly } from '@/rtk/asResult'
 import {
   CONTROL_PAGE_SIZE,
   ensureControlType,
@@ -63,7 +63,7 @@ export function useInventoryControl(movementType, initialFilters = EMPTY_FILTERS
   const filters = bucket.filters
   const filtersKey = JSON.stringify(filters)
 
-  const catalog = useMemo(() => catalogForUi(catalogRaw), [catalogRaw])
+  const catalog = useMemo(() => catalogActiveOnly(catalogRaw), [catalogRaw])
 
   useEffect(() => {
     dispatch(ensureControlType({ movementType, initialFilters }))

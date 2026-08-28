@@ -33,3 +33,23 @@ export function catalogForUi(catalog) {
     offers: catalog.offers || [],
   }
 }
+
+/** Inventory control + product forms — active categories/subcategories only. */
+export function catalogActiveOnly(catalog) {
+  const ui = catalogForUi(catalog)
+  const parents = (ui.parents || []).filter((row) => row.isActive !== false)
+  const childrenByParent = new Map()
+
+  for (const parent of parents) {
+    const children = (ui.childrenByParent.get(parent.id) || []).filter(
+      (row) => row.isActive !== false,
+    )
+    childrenByParent.set(parent.id, children)
+  }
+
+  return {
+    ...ui,
+    parents,
+    childrenByParent,
+  }
+}
