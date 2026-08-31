@@ -15,7 +15,7 @@ async function ensureMigrationsTable() {
   `)
 }
 
-async function migrate() {
+export async function runMigrations() {
   await ensureMigrationsTable()
 
   const files = fs
@@ -74,12 +74,18 @@ async function migrate() {
     ran += 1
   }
 
-  await pool.end()
   console.log(ran ? `Migrations complete (${ran} new)` : 'Migrations complete (nothing pending)')
 }
 
-migrate().catch(async (error) => {
-  console.error(error)
-  await pool.end()
-  process.exit(1)
-})
+const isCli = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+
+if (isCli) {
+  runMigrations()
+    .catch(async (error) => {
+      console.error(error)
+      process.exitCode = 1
+    })
+    .finally(async () => {
+      await pool.end()
+    })
+}

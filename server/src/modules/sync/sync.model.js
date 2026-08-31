@@ -352,15 +352,13 @@ async function fetchBootstrapUsers(tenantId, branchId, since = null) {
       FROM users u
       JOIN roles r ON r.id = u.role_id
       WHERE u.tenant_id = $1
-        AND u.is_active = true
-        AND (
-          (r.slug = $2 AND u.branch_id = $3)
-          OR (r.slug = $4 AND u.branch_id IS NULL)
-        )
+        AND u.branch_id = $2
+        AND r.slug IN ($3, $4)
         AND ($5::timestamptz IS NULL OR u.created_at > $5::timestamptz)
+        AND ($5::timestamptz IS NOT NULL OR u.is_active = true)
       ORDER BY u.full_name
     `,
-    [ROLES.CASHIER, branchId, ROLES.B2B_ADMIN, since],
+    [branchId, ROLES.BRANCH_MANAGER, ROLES.CASHIER, since],
   )
   return rows
 }
@@ -379,8 +377,8 @@ async function fetchBootstrapCategories(tenantId, branchId, since = null) {
       FROM categories
       WHERE tenant_id = $1
         AND branch_id = $2
-        AND is_active = true
         AND ($3::timestamptz IS NULL OR created_at > $3::timestamptz)
+        AND ($3::timestamptz IS NOT NULL OR is_active = true)
       ORDER BY name
     `,
     [branchId, since],
@@ -411,8 +409,8 @@ async function fetchBootstrapProducts(tenantId, branchId, since = null) {
       FROM products p
       WHERE p.tenant_id = $1
         AND p.branch_id = $2
-        AND p.status = 'active'
         AND ($3::timestamptz IS NULL OR p.created_at > $3::timestamptz)
+        AND ($3::timestamptz IS NOT NULL OR p.status = 'active')
       ORDER BY p.name
     `,
     [branchId, since],

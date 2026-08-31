@@ -7,44 +7,73 @@ import {
 import {
   bootstrapQuerySchema,
   deltaQuerySchema,
+  normalizeSyncEventPayload,
+  parseSchemaOrThrow,
   pushBodySchema,
 } from './sync.validator.js'
 import { resolveSyncPullBranchId, resolveSyncPushBranchId } from './sync.access.js'
+import { mapSnapshotForPos } from './sync.mapper.js'
 import { success } from '../../utils/response.util.js'
 
 export async function push(req, res) {
-  const parsed = pushBodySchema.parse(req.body)
-  const branchId = resolveSyncPushBranchId(req)
-  const saved = []
+  const parsed = parseSchemaOrThrow(pushBodySchema, req.body, 'Push body')
+  const branchId = resolveSyncPushBranchId(req, parsed.branchId)
+
+  const accepted = []
+  const rejected = []
+  const events = []
 
   for (const event of parsed.events) {
-    const row = await ingestSyncEvent(
-      req.tenantId,
-      {
-        ...event,
-        branchId,
-        syncedBy: req.user.id,
-      },
-      req.user.id,
-    )
-    saved.push(row)
+    const normalized = {
+      ...event,
+      deviceId: event.deviceId || parsed.deviceId || null,
+      payload: normalizeSyncEventPayload(event.eventType, event.payload),
+    }
+
+    try {
+      const row = await ingestSyncEvent(
+        req.tenantId,
+        {
+          ...normalized,
+          branchId,
+          syncedBy: req.user.id,
+        },
+        req.user.id,
+      )
+      events.push(row)
+      accepted.push(row.clientEventId)
+    } catch (err) {
+      rejected.push({
+        clientEventId: event.clientEventId,
+        reason: err.message || 'Event rejected',
+      })
+    }
   }
 
-  return success(res, { accepted: saved.length, events: saved }, 202)
+  return success(
+    res,
+    {
+      accepted,
+      rejected,
+      events,
+      acceptedCount: accepted.length,
+    },
+    202,
+  )
 }
 
 export async function bootstrap(req, res) {
-  const { branchId } = bootstrapQuerySchema.parse(req.query)
+  const { branchId } = parseSchemaOrThrow(bootstrapQuerySchema, req.query, 'Bootstrap query')
   const resolvedBranchId = resolveSyncPullBranchId(req, branchId)
   const snapshot = await buildBootstrapSnapshot(req.tenantId, resolvedBranchId)
-  return success(res, snapshot)
+  return success(res, mapSnapshotForPos(snapshot))
 }
 
 export async function delta(req, res) {
-  const { branchId, since } = deltaQuerySchema.parse(req.query)
+  const { branchId, since } = parseSchemaOrThrow(deltaQuerySchema, req.query, 'Delta query')
   const resolvedBranchId = resolveSyncPullBranchId(req, branchId)
   const snapshot = await buildDeltaSnapshot(req.tenantId, resolvedBranchId, since)
-  return success(res, snapshot)
+  return success(res, mapSnapshotForPos(snapshot))
 }
 
 /** Cloud pos_sync_events audit log — not POS catalog. */

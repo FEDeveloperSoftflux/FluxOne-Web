@@ -8,6 +8,7 @@ function httpError(status, message) {
 
 const BRANCH_LOCKED_ROLES = new Set([
   ROLES.CASHIER,
+  ROLES.BRANCH_MANAGER,
   ROLES.INVENTORY_MANAGER,
   ROLES.BRANCH_ADMIN,
 ])
@@ -30,11 +31,17 @@ export function resolveSyncPullBranchId(req, queryBranchId) {
   return branchId
 }
 
-/** Push requires branch on token for branch-scoped roles. */
-export function resolveSyncPushBranchId(req) {
-  const branchId = req.user?.branchId || null
-  if (BRANCH_LOCKED_ROLES.has(req.user?.role) && !branchId) {
-    throw httpError(403, 'Account is not assigned to a branch')
+/** Push resolves branch from body or JWT; branch-scoped roles must match token. */
+export function resolveSyncPushBranchId(req, bodyBranchId) {
+  const branchId = bodyBranchId || req.user?.branchId || null
+  if (!branchId) {
+    throw httpError(422, 'branchId is required')
   }
+
+  const tokenBranchId = req.user?.branchId || null
+  if (BRANCH_LOCKED_ROLES.has(req.user?.role) && tokenBranchId && tokenBranchId !== branchId) {
+    throw httpError(403, 'Branch access denied')
+  }
+
   return branchId
 }

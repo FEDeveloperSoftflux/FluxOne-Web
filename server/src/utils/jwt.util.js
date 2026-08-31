@@ -44,5 +44,19 @@ export function signAuthTokens(user) {
   return {
     accessToken: signAccessToken(payload),
     refreshToken: signRefreshToken(payload),
+    expiresIn: getAccessTokenExpiresInSeconds(),
   }
+}
+
+/** Seconds until access token expiry (for POS login contract). */
+export function getAccessTokenExpiresInSeconds() {
+  const raw = process.env.JWT_ACCESS_EXPIRES || '15m'
+  const match = String(raw).match(/^(\d+)([smhd]?)$/i)
+  if (!match) return 3600
+  const value = Number(match[1])
+  const unit = (match[2] || 's').toLowerCase()
+  if (unit === 'm') return value * 60
+  if (unit === 'h') return value * 3600
+  if (unit === 'd') return value * 86400
+  return value
 }

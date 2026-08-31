@@ -1,8 +1,7 @@
 # FluxOne Cloud Sync API — Phase 1 Roadmap
 
-> **Status:** In progress  
-> **Repo:** `FluxOne_Inventory` (Cloud API)  
-> **Consumer:** FluxOne POS (offline SQLite + Electron)
+> **Status:** Phase 1 complete — POS contract v1 aligned  
+> **Contract doc:** [docs/POS_SYNC_CONTRACT.md](../docs/POS_SYNC_CONTRACT.md)
 
 ## Problem Statement
 
@@ -103,7 +102,7 @@ Current sync endpoints do not match POS expectations:
 **Auth:** `sync:pull` permission.
 
 **Branch access:**
-- `cashier`, `inventory_manager`, `branch_admin` — JWT `branchId` **must** match query `branchId` (403 on mismatch)
+- `cashier`, `branch_manager`, `inventory_manager`, `branch_admin` — JWT `branchId` **must** match query `branchId` (403 on mismatch)
 - `b2b_admin` — any branch in tenant
 
 **Response:**
@@ -162,9 +161,9 @@ Current sync endpoints do not match POS expectations:
 ```
 
 **Users included:**
-- Active `cashier` users where `branch_id = branchId`
-- Active `b2b_admin` users where `branch_id IS NULL` (POS "Login as Admin")
-- **Never** return plain-text passwords — only `passwordHash`
+- Active `branch_manager` + `cashier` where `branch_id = branchId`
+- Each user includes `passwordHash` (bcrypt)
+- **Never** `inventory_manager` or `b2b_admin`
 
 ---
 
@@ -266,11 +265,11 @@ Same queries with `created_at > since` / `updated_at > since` filters.
 
 ---
 
-## Permissions (unchanged)
+## Permissions
 
 From `server/src/config/constants.js`:
-- `sync:push` — cashier, branch_admin, inventory_manager, b2b_admin
-- `sync:pull` — cashier, branch_admin, inventory_manager, b2b_admin
+- `sync:push` — cashier, **branch_manager**, branch_admin, inventory_manager, b2b_admin
+- `sync:pull` — cashier, **branch_manager**, branch_admin, inventory_manager, b2b_admin
 
 JWT payload: `{ sub, role, tenantId, branchId }`
 
@@ -280,8 +279,12 @@ JWT payload: `{ sub, role, tenantId, branchId }`
 
 - [x] This roadmap file exists
 - [x] Push creates `sales` + `sale_items` + `inventory_ledger` atomically
-- [x] Bootstrap returns branch-scoped UUID catalog + users with `passwordHash`
+- [x] Bootstrap returns branch-scoped UUID catalog + BM/cashier users with `passwordHash`
 - [x] Delta returns incremental changes
 - [x] Old `/pull` deprecated; `/events` added
+- [x] `branch_manager` sync permissions + branch lock
+- [x] POS field aliases on push + dual response aliases on pull
+- [x] Login/refresh POS aliases (`accessToken`, `branches`, `expiresIn`)
+- [x] POS contract doc: `docs/POS_SYNC_CONTRACT.md`
 - [ ] BM dashboard shows sales after POS push (verify with live DB)
-- [x] Manual test script documented (`server/scripts/test-sync-push.js`)
+- [x] Migrations run on server startup

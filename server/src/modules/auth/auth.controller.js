@@ -6,6 +6,8 @@ import {
   updatePasswordHash,
 } from './auth.model.js'
 import { signAuthTokens, verifyRefreshToken } from '../../utils/jwt.util.js'
+import { listBranchesForLookup } from '../inventory-manager/lookups/lookup.model.js'
+import { ROLES } from '../../config/constants.js'
 import { fail, success } from '../../utils/response.util.js'
 
 function publicUser(user) {
@@ -19,6 +21,31 @@ function publicUser(user) {
     tenantName: user.tenantName || null,
     branchId: user.branchId,
     branchName: user.branchName || null,
+  }
+}
+
+async function branchesForUser(user) {
+  if (user.role === ROLES.B2B_ADMIN) {
+    const rows = await listBranchesForLookup(user.tenantId)
+    return rows.map((b) => ({ id: b.id, name: b.name, code: null }))
+  }
+
+  if (user.branchId) {
+    return [{ id: user.branchId, name: user.branchName || null, code: null }]
+  }
+
+  return []
+}
+
+function authPayload(user, tokens) {
+  return {
+    accessToken: tokens.accessToken,
+    token: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+    expiresIn: tokens.expiresIn,
+    tenantId: user.tenantId,
+    user: publicUser(user),
+    branches: [],
   }
 }
 
@@ -51,11 +78,9 @@ export async function login(req, res) {
 
   const user = matched[0]
   const tokens = signAuthTokens(user)
-  return success(res, {
-    token: tokens.accessToken,
-    refreshToken: tokens.refreshToken,
-    user: publicUser(user),
-  })
+  const payload = authPayload(user, tokens)
+  payload.branches = await branchesForUser(user)
+  return success(res, payload)
 }
 
 export async function me(req, res) {
@@ -95,11 +120,9 @@ export async function refresh(req, res) {
       return fail(res, 'Invalid refresh token', 401)
     }
     const tokens = signAuthTokens(user)
-    return success(res, {
-      token: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      user: publicUser(user),
-    })
+    const payload = authPayload(user, tokens)
+    payload.branches = await branchesForUser(user)
+    return success(res, payload)
   } catch {
     return fail(res, 'Invalid refresh token', 401)
   }
