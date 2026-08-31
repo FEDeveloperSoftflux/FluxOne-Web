@@ -7,7 +7,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogCancelButton,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,7 +18,6 @@ import {
   fetchControlProductOptions,
   fetchControlSuppliers,
 } from '@/hooks/useInventoryControl'
-import { useFormBaseline } from '@/hooks/useFormBaseline'
 import { cn } from '@/lib/utils'
 
 const STEPS = [
@@ -27,6 +25,51 @@ const STEPS = [
   { id: 2, label: '2. Set Qty' },
   { id: 3, label: '3. Confirm' },
 ]
+
+// Helper function to get tomorrow's date in YYYY-MM-DD format
+function getTomorrowDateString() {
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  const year = tomorrow.getFullYear()
+  const month = String(tomorrow.getMonth() + 1).padStart(2, '0')
+  const day = String(tomorrow.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+// Helper function to validate expiry date - must be in future (not today, not past)
+function validateExpiryDate(expiryDateString) {
+  if (!expiryDateString) return true // Optional field
+
+  let expiryDate
+
+  // Handle different date formats
+  if (expiryDateString.includes('/')) {
+    // DD/MM/YYYY format
+    const parts = expiryDateString.split('/')
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10)
+      const month = parseInt(parts[1], 10)
+      const year = parseInt(parts[2], 10)
+      expiryDate = new Date(year, month - 1, day)
+    }
+  } else if (expiryDateString.includes('-')) {
+    // YYYY-MM-DD format
+    expiryDate = new Date(expiryDateString)
+  } else {
+    expiryDate = new Date(expiryDateString)
+  }
+
+  if (isNaN(expiryDate.getTime())) {
+    return false
+  }
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  expiryDate.setHours(0, 0, 0, 0)
+
+  // Date must be AFTER today (tomorrow or later) - not today, not past
+  return expiryDate > today
+}
 
 /**
  * 3-step Add Stock wizard (Select Item → Set Qty → Confirm).
@@ -54,23 +97,8 @@ export function AddStockInDialog({
   const [unitCost, setUnitCost] = useState('')
   const [expiresAt, setExpiresAt] = useState('')
   const [error, setError] = useState(null)
+  const [expiryError, setExpiryError] = useState('') // New state for expiry error
   const [loadingOptions, setLoadingOptions] = useState(false)
-  const { captureBaseline, isDirty } = useFormBaseline(open)
-
-  const formSnapshot = useMemo(
-    () => ({
-      step,
-      categoryId,
-      subcategoryId,
-      productId,
-      supplierId,
-      scale,
-      quantity,
-      unitCost,
-      expiresAt,
-    }),
-    [step, categoryId, subcategoryId, productId, supplierId, scale, quantity, unitCost, expiresAt],
-  )
 
   const subs = useMemo(() => {
     if (!categoryId || !childrenByParent?.get) return []
@@ -89,29 +117,18 @@ export function AddStockInDialog({
 
   useEffect(() => {
     if (!open) return
-    const snapshot = {
-      step: 1,
-      categoryId: '',
-      subcategoryId: '',
-      productId: '',
-      supplierId: '',
-      scale: 'unit',
-      quantity: '1',
-      unitCost: '',
-      expiresAt: '',
-    }
-    setStep(snapshot.step)
+    setStep(1)
     setError(null)
-    setCategoryId(snapshot.categoryId)
-    setSubcategoryId(snapshot.subcategoryId)
-    setProductId(snapshot.productId)
+    setExpiryError('')
+    setCategoryId('')
+    setSubcategoryId('')
+    setProductId('')
     setProducts([])
-    setSupplierId(snapshot.supplierId)
-    setScale(snapshot.scale)
-    setQuantity(snapshot.quantity)
-    setUnitCost(snapshot.unitCost)
-    setExpiresAt(snapshot.expiresAt)
-    captureBaseline(snapshot)
+    setSupplierId('')
+    setScale('unit')
+    setQuantity('1')
+    setUnitCost('')
+    setExpiresAt('')
     setLoadingOptions(true)
     void (async () => {
       const supRes = await fetchControlSuppliers()
@@ -139,6 +156,8 @@ export function AddStockInDialog({
 
   function goNext() {
     setError(null)
+    setExpiryError('')
+    
     if (step === 1) {
       if (!productId) {
         setError('Select a product')
@@ -151,26 +170,38 @@ export function AddStockInDialog({
       setStep(2)
       return
     }
+    
     if (step === 2) {
       if (!scale || !(Number(quantity) > 0)) {
         setError('Enter a valid scale and positive quantity')
         return
       }
+      
       setStep(3)
     }
   }
 
   function goBack() {
     setError(null)
+    setExpiryError('')
     setStep((s) => Math.max(1, s - 1))
   }
 
   async function handleSave() {
     setError(null)
+    setExpiryError('')
+    
     if (!productId || !(Number(quantity) > 0) || !scale) {
       setError('Missing product, scale, or quantity')
       return
     }
+    
+    // Final validation for expiry date
+    if (expiresAt && !validateExpiryDate(expiresAt)) {
+      setExpiryError('Expired product cannot be added in stock')
+      return
+    }
+    
     const payload = {
       supplierId: supplierId || undefined,
       lines: [
@@ -190,8 +221,12 @@ export function AddStockInDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} dirty={isDirty(formSnapshot)}>
-      <DialogContent className="max-w-md">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent 
+        className="max-w-md"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>Add New Stock</DialogTitle>
           <DialogDescription className="sr-only">
@@ -308,10 +343,18 @@ export function AddStockInDialog({
               <Label>Quantity to Add</Label>
               <Input
                 type="number"
-                min="0.001"
-                step="any"
+                inputMode="numeric"
+                min="1"
+                step="1"
                 value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
+                placeholder="Enter quantity"
+                onChange={(e) => {
+                  const val = e.target.value
+                  // Allow manual input of any number >= 1
+                  if (val === '' || Number(val) >= 1) {
+                    setQuantity(val)
+                  }
+                }}
               />
             </div>
             <div className="space-y-1.5">
@@ -330,7 +373,12 @@ export function AddStockInDialog({
               <Input
                 type="date"
                 value={expiresAt}
-                onChange={(e) => setExpiresAt(e.target.value)}
+                min={getTomorrowDateString()}
+                onChange={(e) => {
+                  setExpiresAt(e.target.value)
+                  // Clear error when user updates date
+                  if (expiryError) setExpiryError('')
+                }}
               />
               <p className="text-xs text-slate-500">
                 When set, stock past this date is moved to Expired automatically.
@@ -396,7 +444,7 @@ export function AddStockInDialog({
             <Button
               type="button"
               variant="outline"
-              className="cursor-pointer"
+              className="cursor-pointer transition-none"
               style={{ color: BRAND.purple, borderColor: BRAND.purple }}
               disabled={loading}
               onClick={goBack}
@@ -405,15 +453,20 @@ export function AddStockInDialog({
               Back
             </Button>
           ) : null}
-          <DialogCancelButton
-            className="cursor-pointer"
+          <Button
+            type="button"
+            variant="outline"
+            className="cursor-pointer transition-none"
             style={{ color: BRAND.purple, borderColor: BRAND.purple }}
             disabled={loading}
-          />
+            onClick={() => onOpenChange?.(false)}
+          >
+            Cancel
+          </Button>
           {step < 3 ? (
             <Button
               type="button"
-              className="cursor-pointer text-white"
+              className="cursor-pointer text-white transition-none"
               style={{ background: `linear-gradient(135deg, ${BRAND.purple}, ${BRAND.deep})` }}
               disabled={loading || loadingOptions}
               onClick={goNext}
@@ -424,7 +477,7 @@ export function AddStockInDialog({
           ) : (
             <Button
               type="button"
-              className="cursor-pointer text-white"
+              className="cursor-pointer text-white transition-none"
               style={{ background: `linear-gradient(135deg, ${BRAND.purple}, ${BRAND.deep})` }}
               disabled={loading}
               onClick={handleSave}

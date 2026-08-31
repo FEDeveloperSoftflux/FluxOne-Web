@@ -34,7 +34,7 @@ function useDebouncedSearch(updateFilters) {
   return { localQ, setLocalQ, onSearchChange }
 }
 
-/** Tabs that expose an “Add …” CTA (Stock Out / Expired are history-only). */
+/** Tabs that expose an "Add …" CTA (Stock Out / Expired are history-only). */
 const TABS_WITH_ADD = new Set([
   MOVEMENT_TYPES.IN,
   MOVEMENT_TYPES.ADJUSTMENT,
@@ -45,7 +45,7 @@ const TABS_WITH_EDIT = new Set([MOVEMENT_TYPES.ADJUSTMENT, MOVEMENT_TYPES.DAMAGE
 
 function ControlTabPanel({ tab }) {
   const {
-    items,
+    items: rawItems,
     pagination,
     filters,
     loading,
@@ -61,6 +61,28 @@ function ControlTabPanel({ tab }) {
     stockInFromOrder,
   } = useInventoryControl(tab)
 
+  // Fetch adjustments when on Stock In or Stock Out tabs
+  const {
+    items: adjustmentItems,
+    loading: adjustmentLoading,
+  } = (tab === MOVEMENT_TYPES.IN || tab === MOVEMENT_TYPES.OUT) ? useInventoryControl(MOVEMENT_TYPES.ADJUSTMENT) : { items: [], loading: false }
+
+  // Combine items based on current tab
+  const items = 
+    tab === MOVEMENT_TYPES.IN
+      ? [
+          ...rawItems,
+          ...(adjustmentItems?.filter(adj => adj.quantity > 0) || []),
+        ].sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date))
+      : tab === MOVEMENT_TYPES.OUT
+        ? [
+            ...rawItems,
+            ...(adjustmentItems?.filter(adj => adj.quantity < 0) || []),
+          ].sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date))
+        : rawItems
+
+  const combinedLoading = (tab === MOVEMENT_TYPES.IN || tab === MOVEMENT_TYPES.OUT) ? loading || adjustmentLoading : loading
+
   const { localQ, setLocalQ, onSearchChange } = useDebouncedSearch(updateFilters)
 
   const [addOpen, setAddOpen] = useState(false)
@@ -70,7 +92,7 @@ function ControlTabPanel({ tab }) {
 
   const canAdd = TABS_WITH_ADD.has(tab)
   const canEdit = TABS_WITH_EDIT.has(tab)
-  const slowHint = useSlowLoadingHint(loading)
+  const slowHint = useSlowLoadingHint(combinedLoading)
 
   function handleFilterChange(patch) {
     if (patch.q !== undefined) setLocalQ(patch.q)
@@ -164,13 +186,6 @@ function ControlTabPanel({ tab }) {
         <div className="flex flex-wrap items-center justify-end gap-2">{titleActions}</div>
       ) : null}
 
-      {tab === MOVEMENT_TYPES.OUT ? (
-        <p className="rounded-xl border border-dashed border-border bg-slate-50/80 px-3 py-2 text-sm text-slate-600">
-          Stock out is recorded automatically from sales, damaged, expired, and negative adjustments —
-          history only on this tab.
-        </p>
-      ) : null}
-
       {tab === MOVEMENT_TYPES.EXPIRED ? (
         <p className="rounded-xl border border-dashed border-border bg-slate-50/80 px-3 py-2 text-sm text-slate-600">
           Expired stock is processed automatically from stock-in lots past their expiry date. Set an
@@ -196,7 +211,7 @@ function ControlTabPanel({ tab }) {
         {tab === MOVEMENT_TYPES.IN ? (
           <StockInTable
             items={items}
-            loading={loading}
+            loading={combinedLoading}
             pagination={pagination}
             onPageChange={setPage}
           />
@@ -204,7 +219,7 @@ function ControlTabPanel({ tab }) {
         {tab === MOVEMENT_TYPES.OUT ? (
           <StockOutTable
             items={items}
-            loading={loading}
+            loading={combinedLoading}
             pagination={pagination}
             onPageChange={setPage}
           />
