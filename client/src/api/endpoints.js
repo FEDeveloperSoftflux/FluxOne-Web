@@ -10,7 +10,6 @@ export const endpoints = {
     overview: '/inventory/dashboard/overview',
     alerts: '/inventory/dashboard/alerts',
     stockGraph: '/inventory/dashboard/stock-graph',
-    /** @deprecated use overview / alerts / stockGraph */
     summary: '/inventory/dashboard/overview',
   },
   branch: {
