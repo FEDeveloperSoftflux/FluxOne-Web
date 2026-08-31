@@ -1,8 +1,11 @@
 import { z } from 'zod'
 import { SALE_STATUS } from '../../config/constants.js'
 
+/** Accept demo/seed UUID-shaped ids (Zod 4 z.uuid() is RFC-4122 strict). */
+const idSchema = z.guid()
+
 export const saleLineSchema = z.object({
-  productId: z.string().uuid(),
+  productId: idSchema,
   quantity: z.coerce.number().positive(),
   scale: z.string().min(1).optional(),
   unitPrice: z.coerce.number().nonnegative().optional(),
@@ -17,7 +20,7 @@ export const salePayloadSchema = z.object({
   saleNumber: z.string().optional(),
   soldAt: z.string().optional(),
   counterCode: z.string().optional(),
-  staffUserId: z.string().uuid().optional(),
+  staffUserId: idSchema.optional(),
   paymentMethod: z.string().optional(),
   subtotal: z.coerce.number().nonnegative().optional(),
   taxAmount: z.coerce.number().nonnegative().optional(),
@@ -47,16 +50,16 @@ export const syncEventSchema = z.object({
 
 export const pushBodySchema = z.object({
   deviceId: z.string().optional(),
-  branchId: z.string().uuid().optional(),
+  branchId: idSchema.optional(),
   events: z.array(syncEventSchema).min(1),
 })
 
 export const bootstrapQuerySchema = z.object({
-  branchId: z.string().uuid(),
+  branchId: idSchema,
 })
 
 export const deltaQuerySchema = z.object({
-  branchId: z.string().uuid(),
+  branchId: idSchema,
   since: z.string().min(1),
 })
 
