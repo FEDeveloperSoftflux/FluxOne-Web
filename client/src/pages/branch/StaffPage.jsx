@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
@@ -6,10 +6,17 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { StaffFilters } from '@/components/feature/branch/staff/StaffFilters'
 import { StaffFormDialog } from '@/components/feature/branch/staff/StaffFormDialog'
 import { StaffTable } from '@/components/feature/branch/staff/StaffTable'
+import { DesignationFormDialog } from '@/components/feature/branch/designations/DesignationFormDialog'
+import { StaffAttendanceTab } from '@/components/feature/branch/staff/StaffAttendanceTab'
+import { StaffHolidaysTab } from '@/components/feature/branch/staff/StaffHolidaysTab'
+import { StaffLeavesTab } from '@/components/feature/branch/staff/StaffLeavesTab'
+import { StaffPerformanceTab } from '@/components/feature/branch/staff/StaffPerformanceTab'
 import { Button } from '@/components/ui/button'
 import { useBranchStaff } from '@/hooks/useBranchStaff'
 import { BRAND } from '@/lib/constants'
 import { toastError, toastSuccess } from '@/lib/toast'
+import { apiClient } from '@/api/api'
+import { endpoints } from '@/api/endpoints'
 
 function useDebouncedSearch(updateFilters) {
   const [localQ, setLocalQ] = useState('')
@@ -48,6 +55,20 @@ export function StaffPage() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [statusTarget, setStatusTarget] = useState(null)
   const [statusUpdatingId, setStatusUpdatingId] = useState(null)
+  const [designations, setDesignations] = useState([])
+  const [designationFormOpen, setDesignationFormOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState('list')
+
+  const loadDesignations = async () => {
+    const res = await apiClient.get(endpoints.branch.designations.list, { active: 'active', limit: 100 })
+    if (res.success && res.data) {
+      setDesignations(res.data.items || res.data || [])
+    }
+  }
+
+  useEffect(() => {
+    void loadDesignations()
+  }, [])
 
   function openCreate() {
     setFormMode('create')
@@ -119,15 +140,26 @@ export function StaffPage() {
           title="Staff Management"
           description="Manage Inventory Managers and Cashiers for your branch only."
           actions={
-            <Button
-              type="button"
-              onClick={openCreate}
-              style={{ background: BRAND.purple }}
-              className="w-full text-white hover:opacity-90 sm:w-auto"
-            >
-              <Plus className="size-4" />
-              Add Staff
-            </Button>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+              {/* <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDesignationFormOpen(true)}
+                style={{ color: BRAND.purple, borderColor: BRAND.purple }}
+                className="w-full bg-white hover:bg-purple-50/40 sm:w-auto"
+              >
+                + Create Designation
+              </Button> */}
+              <Button
+                type="button"
+                onClick={openCreate}
+                style={{ background: BRAND.purple }}
+                className="w-full text-white hover:opacity-90 sm:w-auto"
+              >
+                <Plus className="size-4" />
+                Add Staff
+              </Button>
+            </div>
           }
         />
       </MotionHeader>
@@ -138,29 +170,89 @@ export function StaffPage() {
         </p>
       ) : null}
 
-      <MotionReveal delay={0.04}>
-        <StaffFilters
-          q={localQ}
-          status={filters.status || ''}
-          onChange={(patch) => {
-            if (patch.q !== undefined) onSearchChange(patch.q)
-            if (patch.status !== undefined) updateFilters({ status: patch.status })
-          }}
-        />
-      </MotionReveal>
+      {/* Sub tabs navigation */}
+      <div className="flex border-b border-slate-200 gap-8 pb-[1px] mb-6 overflow-x-auto whitespace-nowrap scrollbar-none">
+        {[
+          { id: 'list', label: 'Staff Roster' },
+          { id: 'attendance', label: 'Attendance' },
+          { id: 'holidays', label: 'Holidays' },
+          { id: 'leaves', label: 'Leaves' },
+          { id: 'performance', label: 'Performance' },
+        ].map((tab) => {
+          const active = activeTab === tab.id
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`pb-3 text-sm font-semibold transition-all relative ${
+                active
+                  ? 'text-purple-700 font-bold'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              {tab.label}
+              {active && (
+                <span className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-purple-700 rounded-full" />
+              )}
+            </button>
+          )
+        })}
+      </div>
 
-      <MotionReveal delay={0.08}>
-        <StaffTable
-          items={items}
-          loading={loading}
-          pagination={pagination}
-          onPageChange={setPage}
-          onEdit={openEdit}
-          onDelete={setDeleteTarget}
-          onStatusChange={handleStatusChange}
-          statusUpdatingId={statusUpdatingId}
-        />
-      </MotionReveal>
+      {activeTab === 'list' && (
+        <>
+          <MotionReveal delay={0.04}>
+            <StaffFilters
+              q={localQ}
+              status={filters.status || ''}
+              designationId={filters.designationId || ''}
+              designations={designations}
+              onChange={(patch) => {
+                if (patch.q !== undefined) onSearchChange(patch.q)
+                if (patch.status !== undefined) updateFilters({ status: patch.status })
+                if (patch.designationId !== undefined) updateFilters({ designationId: patch.designationId })
+              }}
+            />
+          </MotionReveal>
+
+          <MotionReveal delay={0.08}>
+            <StaffTable
+              items={items}
+              loading={loading}
+              pagination={pagination}
+              onPageChange={setPage}
+              onEdit={openEdit}
+              onDelete={setDeleteTarget}
+              onStatusChange={handleStatusChange}
+              statusUpdatingId={statusUpdatingId}
+            />
+          </MotionReveal>
+        </>
+      )}
+
+      {activeTab === 'attendance' && (
+        <MotionReveal delay={0.04}>
+          <StaffAttendanceTab designations={designations} staff={items} />
+        </MotionReveal>
+      )}
+
+      {activeTab === 'holidays' && (
+        <MotionReveal delay={0.04}>
+          <StaffHolidaysTab designations={designations} staff={items} />
+        </MotionReveal>
+      )}
+
+      {activeTab === 'leaves' && (
+        <MotionReveal delay={0.04}>
+          <StaffLeavesTab designations={designations} staff={items} />
+        </MotionReveal>
+      )}
+
+      {activeTab === 'performance' && (
+        <MotionReveal delay={0.04}>
+          <StaffPerformanceTab designations={designations} />
+        </MotionReveal>
+      )}
 
       <StaffFormDialog
         open={formOpen}
@@ -201,6 +293,15 @@ export function StaffPage() {
         confirmLabel="Delete"
         loading={mutating}
         onConfirm={handleConfirmDelete}
+      />
+
+      <DesignationFormDialog
+        open={designationFormOpen}
+        onOpenChange={setDesignationFormOpen}
+        onSubmitSuccess={(newDesignation) => {
+          toastSuccess('Designation created')
+          void loadDesignations()
+        }}
       />
     </div>
   )

@@ -1,6 +1,6 @@
 export const DEFAULT_PAGE = 1
 export const DEFAULT_PAGE_SIZE = 8
-export const MAX_PAGE_SIZE = 50
+export const MAX_PAGE_SIZE = 200
 
 export function parsePagination(query = {}) {
   const page = Math.max(1, Number(query.page) || DEFAULT_PAGE)

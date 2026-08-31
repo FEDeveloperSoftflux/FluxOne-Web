@@ -14,7 +14,10 @@ const INVENTORY_NAV = [
 export const NAV_BY_ROLE = {
   [ROLES.BRANCH_MANAGER]: [
     { to: PATHS.branch.dashboard, label: 'Dashboard', end: true },
-    { to: PATHS.branch.staff, label: 'Staff', end: false },
+    { to: PATHS.branch.staff, label: 'Staff Management', end: false },
+    { to: PATHS.branch.sales, label: 'Sales Management', end: false },
+    { to: PATHS.branch.customer, label: 'Customer Management', end: false },
+    { to: PATHS.branch.inventory, label: 'Inventory Monitoring', end: false },
   ],
   [ROLES.INVENTORY_MANAGER]: INVENTORY_NAV,
   [ROLES.B2B_ADMIN]: INVENTORY_NAV,

@@ -6,6 +6,7 @@ import {
   getSalesGraphData,
   listStaffPerformanceSnapshot,
   renderBranchReportHtml,
+  getFullBranchDashboard,
 } from './dashboard.model.js'
 import { success } from '../../../utils/response.util.js'
 import { paginatedResult } from '../../../utils/pagination.util.js'
@@ -52,4 +53,9 @@ export async function downloadReport(req, res) {
   res.setHeader('Content-Type', 'text/html; charset=utf-8')
   res.setHeader('Content-Disposition', 'inline; filename="branch-report.html"')
   return res.status(200).send(html)
+}
+
+export async function fullDashboard(req, res) {
+  const data = await getFullBranchDashboard(req.tenantId, withBranchScope(req))
+  return success(res, data)
 }

@@ -6,6 +6,7 @@ import {
   salesGraph,
   salesSummary,
   staffPerformance,
+  fullDashboard,
 } from './dashboard.controller.js'
 import { asyncHandler } from '../../../middlewares/error.middleware.js'
 import { requirePermission } from '../../../middlewares/role.middleware.js'
@@ -13,6 +14,13 @@ import { validate } from '../../../middlewares/validate.middleware.js'
 import { dashboardPaginatedQuerySchema, dashboardQuerySchema } from './dashboard.validator.js'
 
 const router = Router()
+
+router.get(
+  '/',
+  requirePermission('branch-dashboard:read'),
+  validate(dashboardQuerySchema),
+  asyncHandler(fullDashboard),
+)
 
 router.get(
   '/overview',

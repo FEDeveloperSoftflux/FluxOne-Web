@@ -25,6 +25,17 @@ export const endpoints = {
     },
     designations: {
       list: '/branch/designations',
+      create: '/branch/designations',
+    },
+    sales: {
+      list: '/branch/sales',
+      refund: (id) => `/branch/sales/${id}/refund`,
+    },
+    discounts: {
+      list: '/branch/discounts',
+      create: '/branch/discounts',
+      update: (id) => `/branch/discounts/${id}`,
+      delete: (id) => `/branch/discounts/${id}`,
     },
   },
   products: {

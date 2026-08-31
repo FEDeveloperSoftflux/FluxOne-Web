@@ -17,12 +17,15 @@ import { validateStaffForm } from '@/lib/validation/staffSchedule'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
 import { IMAGE_ACCEPT, imageUploadHint, validateImageFile } from '@/lib/imageUpload'
 import { toastError } from '@/lib/toast'
+import { apiClient } from '@/api/api'
+import { endpoints } from '@/api/endpoints'
 
 const EMPTY_FORM = {
   email: '',
   password: '',
   fullName: '',
   role: 'inventory_manager',
+  designationId: '',
   hardwareDeviceId: '',
   scheduleStart: '',
   scheduleBreakStart: '',
@@ -53,12 +56,24 @@ export function StaffFormDialog({
   const [form, setForm] = useState(EMPTY_FORM)
   const [error, setError] = useState(null)
   const [imageError, setImageError] = useState(null)
+  const [designations, setDesignations] = useState([])
   const { captureBaseline, isDirty } = useFormBaseline(open)
 
   useEffect(() => {
     if (!open) return
     setError(null)
     setImageError(null)
+
+    // Fetch designations
+    async function loadDesignations() {
+      const res = await apiClient.get(endpoints.branch.designations.list, { active: 'active', limit: 100 })
+      if (res.success && res.data) {
+        const list = res.data.items || res.data || []
+        setDesignations(list)
+      }
+    }
+    void loadDesignations()
+
     if (isEdit && initialStaff) {
       const nextForm = {
         email: initialStaff.email || '',
@@ -78,6 +93,7 @@ export function StaffFormDialog({
           if (designation.includes('cashier')) return 'cashier'
           return 'inventory_manager'
         })(),
+        designationId: initialStaff.designationId || '',
         hardwareDeviceId: initialStaff.hardwareDeviceId || '',
         scheduleStart: timeInputValue(initialStaff.scheduleStart),
         scheduleBreakStart: timeInputValue(initialStaff.scheduleBreakStart),
@@ -166,7 +182,7 @@ export function StaffFormDialog({
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="staff-role">Designation</Label>
+              <Label htmlFor="staff-role">System Role</Label>
               <NativeSelect
                 id="staff-role"
                 value={form.role}
@@ -176,6 +192,22 @@ export function StaffFormDialog({
                 <option value="cashier">Cashier</option>
                 <option value="production_staff">Production Staff</option>
                 <option value="delivery_staff">Delivery Staff</option>
+              </NativeSelect>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="staff-designation">Designation</Label>
+              <NativeSelect
+                id="staff-designation"
+                value={form.designationId}
+                onChange={(e) => patch('designationId', e.target.value)}
+              >
+                <option value="">No custom designation</option>
+                {designations.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
               </NativeSelect>
             </div>
 

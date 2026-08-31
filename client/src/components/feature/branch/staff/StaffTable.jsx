@@ -156,7 +156,7 @@ export function StaffTable({
                           variant="ghost"
                           size="icon"
                           aria-label={`Delete ${row.fullName || 'staff'}`}
-                          className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                          className="text-slate-500 hover:text-slate-800 hover:bg-transparent transition-colors"
                           onClick={() => onDelete?.(row)}
                         >
                           <Trash2 className="size-4" />

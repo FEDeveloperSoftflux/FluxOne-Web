@@ -22,6 +22,16 @@ import { SuppliersPage } from '@/pages/inventory/SuppliersPage'
 import { PurchaseOrdersPage } from '@/pages/inventory/PurchaseOrdersPage'
 import { DashboardPage as BranchDashboardPage } from '@/pages/branch/DashboardPage'
 import { StaffPage } from '@/pages/branch/StaffPage'
+import { AttendancePage } from '@/pages/branch/AttendancePage'
+import { HolidaysPage } from '@/pages/branch/HolidaysPage'
+import { LeavesPage } from '@/pages/branch/LeavesPage'
+import { PerformancePage } from '@/pages/branch/PerformancePage'
+import { SalesPage } from '@/pages/branch/SalesPage'
+import { CustomerPage } from '@/pages/branch/CustomerPage'
+import { BranchInventoryPage } from '@/pages/branch/BranchInventoryPage'
+import { ReportsPage } from '@/pages/branch/ReportsPage'
+import { ResourcesPage } from '@/pages/branch/ResourcesPage'
+import { DiscountsPage } from '@/pages/branch/DiscountsPage'
 import { useAuthSession } from '@/hooks/useAuthSession'
 import CategoriesPage from '@/pages/inventory/CategoriesPage'
 
@@ -64,6 +74,16 @@ const router = createBrowserRouter([
             children: [
               { index: true, element: <BranchDashboardPage /> },
               { path: 'staff', element: <StaffPage /> },
+              { path: 'attendance', element: <AttendancePage /> },
+              { path: 'holidays', element: <HolidaysPage /> },
+              { path: 'leaves', element: <LeavesPage /> },
+              { path: 'performance', element: <PerformancePage /> },
+              { path: 'sales', element: <SalesPage /> },
+              { path: 'customer', element: <CustomerPage /> },
+              { path: 'inventory', element: <BranchInventoryPage /> },
+              { path: 'reports', element: <ReportsPage /> },
+              { path: 'resources', element: <ResourcesPage /> },
+              { path: 'discounts', element: <DiscountsPage /> },
               { path: 'profile', element: <ProfilePage /> },
             ],
           },

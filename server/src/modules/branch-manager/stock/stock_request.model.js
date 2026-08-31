@@ -1,4 +1,4 @@
-import { tenantQuery } from '../../config/db.js'
+import { tenantQuery } from '../../../config/db.js'
 
 function httpError(status, message) {
   const error = new Error(message)

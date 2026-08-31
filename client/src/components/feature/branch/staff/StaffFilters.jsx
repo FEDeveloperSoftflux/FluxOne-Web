@@ -7,7 +7,14 @@ import { Label } from '@/components/ui/label'
 /**
  * Light filters for BM staff list: search + status.
  */
-export function StaffFilters({ q = '', status = '', onChange, className }) {
+export function StaffFilters({
+  q = '',
+  status = '',
+  designationId = '',
+  designations = [],
+  onChange,
+  className,
+}) {
   return (
     <SurfaceCard className={className} padding="compact">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -24,6 +31,23 @@ export function StaffFilters({ q = '', status = '', onChange, className }) {
             />
           </div>
         </div>
+
+        <div className="w-full space-y-1.5 sm:w-48">
+          <Label htmlFor="staff-designation-filter">Designation</Label>
+          <NativeSelect
+            id="staff-designation-filter"
+            value={designationId}
+            onChange={(event) => onChange?.({ designationId: event.target.value })}
+          >
+            <option value="">All designations</option>
+            {designations.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
+
         <div className="w-full space-y-1.5 sm:w-44">
           <Label htmlFor="staff-status-filter">Status</Label>
           <NativeSelect

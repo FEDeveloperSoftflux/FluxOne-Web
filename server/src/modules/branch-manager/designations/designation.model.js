@@ -28,7 +28,7 @@ function activeSqlClause(active) {
 
 export async function listDesignations(tenantId, { q, page = 1, limit = 8, active = 'active' } = {}) {
   const safePage = Math.max(1, Number(page) || 1)
-  const safeLimit = Math.min(50, Math.max(1, Number(limit) || 8))
+  const safeLimit = Math.min(200, Math.max(1, Number(limit) || 8))
   const offset = (safePage - 1) * safeLimit
   const activeClause = activeSqlClause(active)
 

@@ -24,6 +24,7 @@ export function buildStaffPayload(fields) {
     fullName: String(fullName || '').trim(),
     email: String(email || '').trim(),
     role,
+    designationId: fields.designationId || undefined,
     hardwareDeviceId: hardwareDeviceId?.trim() || undefined,
     scheduleStart: scheduleStart || undefined,
     scheduleBreakStart: scheduleBreakStart || undefined,
@@ -50,7 +51,7 @@ export function buildStaffPayload(fields) {
 function defaultFilters(overrides = {}) {
   return {
     q: '',
-    status: 'active',
+    status: '',
     page: 1,
     limit: STAFF_PAGE_SIZE,
     ...overrides,

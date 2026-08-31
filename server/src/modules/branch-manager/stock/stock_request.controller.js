@@ -1,4 +1,4 @@
-import { createStockRequest, listStockRequests } from '../stock_request.model.js'
+import { createStockRequest, listStockRequests } from './stock_request.model.js'
 import { success } from '../../../utils/response.util.js'
 
 export async function stockRequestList(req, res) {

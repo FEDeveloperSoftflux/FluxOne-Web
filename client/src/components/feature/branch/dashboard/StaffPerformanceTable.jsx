@@ -9,11 +9,13 @@ const PAGE_SIZE = 5
 
 const STATUS_STYLES = {
   active: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  inactive: 'bg-slate-100 text-slate-600 ring-slate-200',
   on_break: 'bg-amber-50 text-amber-700 ring-amber-200',
   offline: 'bg-slate-100 text-slate-600 ring-slate-200',
 }
 
 function statusLabel(status) {
+  if (status === 'inactive') return 'Inactive'
   if (status === 'on_break') return 'On break'
   if (status === 'offline') return 'Offline'
   return 'Active'
@@ -36,7 +38,7 @@ export function StaffPerformanceTable({ staff = [], className }) {
   return (
     <SurfaceCard
       className={className}
-      title="Staff Performance"
+      title="Staff List"
       description="Name, ID, status & points"
       actions={
         <span className="text-xs font-medium text-slate-400">
