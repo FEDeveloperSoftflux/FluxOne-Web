@@ -72,12 +72,18 @@ function ControlTabPanel({ tab }) {
     tab === MOVEMENT_TYPES.IN
       ? [
           ...rawItems,
-          ...(adjustmentItems?.filter(adj => adj.quantity > 0) || []),
+          ...(adjustmentItems?.filter(adj => {
+            const qty = Number(adj.quantity || 0)
+            return qty > 0  // Positive adjustments go to Stock In
+          }) || []),
         ].sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date))
       : tab === MOVEMENT_TYPES.OUT
         ? [
             ...rawItems,
-            ...(adjustmentItems?.filter(adj => adj.quantity < 0) || []),
+            ...(adjustmentItems?.filter(adj => {
+              const qty = Number(adj.quantity || 0)
+              return qty < 0  // Negative adjustments go to Stock Out
+            }) || []),
           ].sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date))
         : rawItems
 
