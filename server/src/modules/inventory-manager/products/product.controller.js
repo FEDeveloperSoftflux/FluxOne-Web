@@ -5,6 +5,7 @@ import {
   findOrCreateImportedCategory,
   findProductByBarcode,
   getProductById,
+  getProductDeleteEligibility,
   getProductDetail,
   listCategories,
   listOffers,
@@ -233,9 +234,27 @@ export async function update(req, res) {
 export async function remove(req, res) {
   try {
     const { tenantId, branchId } = resolveInventoryScope(req)
-    const deactivated = await deleteProduct(tenantId, req.validated.params.id, { branchId })
+    const permanent = Boolean(req.validated.query?.permanent)
+    const deactivated = await deleteProduct(tenantId, req.validated.params.id, {
+      branchId,
+      permanent,
+    })
     if (!deactivated) return fail(res, 'Item not found', 404)
+    if (permanent) {
+      return success(res, { id: req.validated.params.id, deleted: true, permanent: true })
+    }
     return success(res, { id: req.validated.params.id, status: 'inactive', deactivated: true })
+  } catch (err) {
+    return scopeError(res, err)
+  }
+}
+
+export async function deleteInfo(req, res) {
+  try {
+    const { tenantId, branchId } = resolveInventoryScope(req)
+    const info = await getProductDeleteEligibility(tenantId, req.validated.params.id, { branchId })
+    if (!info.found) return fail(res, 'Item not found', 404)
+    return success(res, info)
   } catch (err) {
     return scopeError(res, err)
   }

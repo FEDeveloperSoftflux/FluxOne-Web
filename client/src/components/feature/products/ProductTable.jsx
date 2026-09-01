@@ -1,4 +1,4 @@
-import { Package, Pencil, Printer } from 'lucide-react'
+import { Package, Pencil, Printer, Trash2 } from 'lucide-react'
 import { BarcodeCell } from '@/components/feature/products/BarcodeCell'
 import { PricingColumns } from '@/components/feature/products/PricingColumns'
 import { ProductImageCell, ProductStatusToggle } from '@/components/feature/products/ProductStatusToggle'
@@ -19,6 +19,7 @@ export function ProductTable({
   onEdit,
   onPrintBarcode,
   onStatusChange,
+  onDelete,
   className,
 }) {
   const list = Array.isArray(items) ? items : []
@@ -95,6 +96,16 @@ export function ProductTable({
                       >
                         <Pencil className="size-3.5" />
                         Edit
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="cursor-pointer text-red-600 hover:text-red-700"
+                        onClick={() => onDelete?.(row)}
+                      >
+                        <Trash2 className="size-3.5" />
+                        Delete
                       </Button>
                     </div>
                   </div>
@@ -204,6 +215,16 @@ export function ProductTable({
                           onClick={() => onEdit?.(row)}
                         >
                           <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="cursor-pointer text-red-600 hover:text-red-700"
+                          title="Delete"
+                          onClick={() => onDelete?.(row)}
+                        >
+                          <Trash2 className="size-4" />
                         </Button>
                       </div>
                     </td>

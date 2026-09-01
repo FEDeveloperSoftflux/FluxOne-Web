@@ -99,6 +99,16 @@ export function money(value) {
   })
 }
 
+/**
+ * For PATCH: preserve explicit null to clear nullable FK columns.
+ * Empty string / undefined → omit (no change).
+ */
+export function asNullableUuid(value) {
+  if (value === null) return null
+  if (value === undefined || value === '') return undefined
+  return String(value)
+}
+
 /** Build JSON body or FormData when an image file is present. */
 export function buildProductPayload(fields, { withConfirmed = true } = {}) {
   // Never send categoryId: "" — Zod uuid() → 422 Invalid uuid
@@ -147,12 +157,51 @@ export function buildProductPayload(fields, { withConfirmed = true } = {}) {
   return base
 }
 
+/** PATCH body — always sends category/subcategory keys so null can clear subcategory_id. */
+export function buildProductUpdatePayload(fields) {
+  const categoryId = asOptionalUuid(fields.categoryId)
+  const subcategoryRaw = fields.subcategoryId
+  const subcategoryId =
+    subcategoryRaw === null || subcategoryRaw === undefined || subcategoryRaw === ''
+      ? null
+      : String(subcategoryRaw)
+
+  const base = {
+    name: String(fields.name || '').trim(),
+    ...(categoryId ? { categoryId } : {}),
+    subcategoryId,
+    type: fields.type || PRODUCT_TYPES.SINGLE,
+    scale: fields.scale || 'unit',
+    description: fields.description?.trim() || undefined,
+    purchasePrice: Number(fields.purchasePrice ?? 0),
+    sellingPrice: Number(fields.sellingPrice ?? 0),
+    taxIds: cleanUuidList(fields.taxIds),
+    offerId: asOptionalUuid(fields.offerId),
+    discountPercent:
+      fields.discountPercent === '' || fields.discountPercent == null
+        ? undefined
+        : Number(fields.discountPercent),
+    bundleItems: Array.isArray(fields.bundleItems)
+      ? fields.bundleItems
+          .map((row) => ({
+            itemId: asOptionalUuid(row.itemId),
+            quantity: Number(row.quantity),
+          }))
+          .filter((row) => row.itemId)
+      : undefined,
+  }
+
+  return base
+}
+
 /**
  * Prefer JSON create/update (arrays validate). If image present, follow with image-only PATCH.
  */
 export function splitProductWrite(fields, { withConfirmed = true } = {}) {
   const image = fields.image instanceof File && fields.image.size > 0 ? fields.image : null
-  const json = buildProductPayload({ ...fields, image: null }, { withConfirmed })
+  const json = withConfirmed
+    ? buildProductPayload({ ...fields, image: null }, { withConfirmed })
+    : buildProductUpdatePayload({ ...fields, image: null })
   return { json, image }
 }
 

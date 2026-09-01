@@ -5,6 +5,8 @@ import {
   empty,
   idParams,
   looseUuid,
+  nullableLooseUuid,
+  optionalBool,
   optionalLooseUuid,
   paginationQuery,
 } from '../shared.validator.js'
@@ -117,10 +119,20 @@ export const productIdParamsSchema = z.object({
   params: idParams,
 })
 
+export const deleteProductSchema = z.object({
+  body: empty,
+  query: z.object({
+    permanent: optionalBool,
+  }),
+  params: idParams,
+})
+
 export const updateProductSchema = z
   .object({
     body: z.object({
       name: z.string().min(1).optional(),
+      categoryId: optionalLooseUuid,
+      subcategoryId: nullableLooseUuid,
       type: z.enum([PRODUCT_TYPES.SINGLE, PRODUCT_TYPES.BUNDLE]).optional(),
       status: z
         .enum([PRODUCT_STATUS.ACTIVE, PRODUCT_STATUS.INACTIVE, 'open', 'close'])

@@ -44,6 +44,7 @@ export const endpoints = {
     import: '/inventory/products/import',
     scan: '/inventory/products/scan',
     detail: (id) => `/inventory/products/${id}`,
+    deleteInfo: (id) => `/inventory/products/${id}/delete-info`,
     update: (id) => `/inventory/products/${id}`,
     remove: (id) => `/inventory/products/${id}`,
     barcode: (id) => `/inventory/products/${id}/barcode`,

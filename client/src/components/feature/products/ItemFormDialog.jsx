@@ -134,7 +134,7 @@ export function ItemFormDialog({
 
   function validate() {
     if (!form.name.trim()) return 'Name is required'
-    if (!isEdit && !form.categoryId) {
+    if (!form.categoryId) {
       return categories.length
         ? 'Category is required'
         : 'Create a category first (Categories page), then add products'
@@ -190,9 +190,9 @@ export function ItemFormDialog({
       sellingPrice: Number(form.sellingPrice),
       discountPercent:
         form.discountPercent === '' ? undefined : Number(form.discountPercent),
-      // Empty strings must never reach Zod uuid fields
       offerId: form.offerId || undefined,
-      subcategoryId: form.subcategoryId || undefined,
+      subcategoryId:
+        form.subcategoryId === '' || form.subcategoryId == null ? null : form.subcategoryId,
       taxIds: form.taxIds,
       bundleItems:
         type === PRODUCT_TYPES.BUNDLE
@@ -292,46 +292,42 @@ export function ItemFormDialog({
                 />
               </div>
 
-              {!isEdit ? (
-                <>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="product-category">Category</Label>
-                    <NativeSelect
-                      id="product-category"
-                      value={form.categoryId}
-                      onChange={(event) => patch('categoryId', event.target.value)}
-                    >
-                      <option value="">Select category</option>
-                      {categories.map((cat) => (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </option>
-                      ))}
-                    </NativeSelect>
-                    {!categories.length ? (
-                      <p className="text-[11px] text-amber-700">
-                        No categories yet — add one on the Categories page first.
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="product-subcategory">Sub category</Label>
-                    <NativeSelect
-                      id="product-subcategory"
-                      value={form.subcategoryId}
-                      onChange={(event) => patch('subcategoryId', event.target.value)}
-                      disabled={!subcategories.length}
-                    >
-                      <option value="">None</option>
-                      {subcategories.map((sub) => (
-                        <option key={sub.id} value={sub.id}>
-                          {sub.name}
-                        </option>
-                      ))}
-                    </NativeSelect>
-                  </div>
-                </>
-              ) : null}
+              <div className="space-y-1.5">
+                <Label htmlFor="product-category">Category</Label>
+                <NativeSelect
+                  id="product-category"
+                  value={form.categoryId}
+                  onChange={(event) => patch('categoryId', event.target.value)}
+                >
+                  <option value="">Select category</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </NativeSelect>
+                {!categories.length ? (
+                  <p className="text-[11px] text-amber-700">
+                    No categories yet — add one on the Categories page first.
+                  </p>
+                ) : null}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="product-subcategory">Sub category</Label>
+                <NativeSelect
+                  id="product-subcategory"
+                  value={form.subcategoryId}
+                  onChange={(event) => patch('subcategoryId', event.target.value)}
+                  disabled={!subcategories.length}
+                >
+                  <option value="">None</option>
+                  {subcategories.map((sub) => (
+                    <option key={sub.id} value={sub.id}>
+                      {sub.name}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="product-scale">Scale</Label>
@@ -496,6 +492,15 @@ export function ItemFormDialog({
               <p className="mt-1">
                 <span className="text-slate-500">Scale:</span> {form.scale}
               </p>
+              {form.categoryId ? (
+                <p className="mt-1">
+                  <span className="text-slate-500">Category:</span>{' '}
+                  {categories.find((cat) => cat.id === form.categoryId)?.name || '—'}
+                  {form.subcategoryId
+                    ? ` / ${subcategories.find((sub) => sub.id === form.subcategoryId)?.name || '—'}`
+                    : ''}
+                </p>
+              ) : null}
               <p className="mt-1">
                 <span className="text-slate-500">Purchase / Selling:</span>{' '}
                 {form.purchasePrice} / {form.sellingPrice}
@@ -507,7 +512,9 @@ export function ItemFormDialog({
                 </p>
               ) : null}
               <p className="mt-2 text-xs text-slate-400">
-                Item code & barcode will be generated by the system on create.
+                {isEdit
+                  ? 'Review changes before saving.'
+                  : 'Item code & barcode will be generated by the system on create.'}
               </p>
             </div>
 

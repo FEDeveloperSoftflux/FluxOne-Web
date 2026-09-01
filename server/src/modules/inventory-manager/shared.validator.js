@@ -59,3 +59,9 @@ export const optionalLooseUuid = z.preprocess(
   (value) => (value === '' || value === null || value === undefined ? undefined : value),
   looseUuid.optional(),
 )
+
+// Update payloads: null clears FK; undefined/empty omits the field (no change).
+export const nullableLooseUuid = z.preprocess(
+  (value) => (value === '' || value === undefined ? undefined : value),
+  z.union([looseUuid, z.null()]).optional(),
+)

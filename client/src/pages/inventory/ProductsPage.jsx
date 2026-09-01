@@ -9,6 +9,14 @@ import { ScanItemDialog } from '@/components/feature/products/ScanItemDialog'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { PageHeader } from '@/components/shared/PageHeader'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { useProducts } from '@/hooks/useProducts'
 import { BRAND } from '@/lib/constants'
@@ -43,6 +51,8 @@ export function ProductsPage() {
     createProduct,
     updateProduct,
     setProductStatus,
+    deleteProduct,
+    fetchProductDeleteInfo,
     importProducts,
     scanBarcode,
     fetchProductDetail,
@@ -63,6 +73,9 @@ export function ProductsPage() {
   const [printTarget, setPrintTarget] = useState(null)
   const [statusTarget, setStatusTarget] = useState(null)
   const [statusUpdatingId, setStatusUpdatingId] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleteInfo, setDeleteInfo] = useState(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   const activeParents = (catalog.parents || []).filter((row) => row.isActive !== false)
   const activeSubs = (selectedCategorySubs || []).filter((row) => row.isActive !== false)
@@ -135,6 +148,57 @@ export function ProductsPage() {
     await applyProductStatus(statusTarget, PRODUCT_STATUS.INACTIVE)
     setStatusTarget(null)
   }
+
+  async function openDelete(row) {
+    if (!row?.id) return
+    setDeleteTarget(row)
+    setDeleteInfo(null)
+    setDeleteLoading(true)
+    try {
+      const result = await fetchProductDeleteInfo(row.id)
+      if (result.success) setDeleteInfo(result.data)
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  async function handleDeactivateFromDelete() {
+    if (!deleteTarget?.id) return
+    setDeleteLoading(true)
+    try {
+      const result = await deleteProduct({ id: deleteTarget.id, permanent: false })
+      if (result.success) {
+        toastSuccess('Product deactivated')
+        setDeleteTarget(null)
+        setDeleteInfo(null)
+      } else {
+        toastError(result.error || 'Deactivate failed')
+      }
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  async function handlePermanentDelete() {
+    if (!deleteTarget?.id) return
+    setDeleteLoading(true)
+    try {
+      const result = await deleteProduct({ id: deleteTarget.id, permanent: true })
+      if (result.success) {
+        toastSuccess('Product permanently deleted')
+        setDeleteTarget(null)
+        setDeleteInfo(null)
+      } else {
+        toastError(result.error || 'Permanent delete failed')
+      }
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  const deleteIsActive =
+    deleteTarget?.status !== PRODUCT_STATUS.INACTIVE && deleteTarget?.status !== 'close'
+  const canPermanentDelete = Boolean(deleteInfo?.canPermanentDelete)
 
   async function handleExport() {
     const result = await exportCsv()
@@ -255,6 +319,7 @@ export function ProductsPage() {
           onEdit={openEdit}
           onPrintBarcode={setPrintTarget}
           onStatusChange={handleStatusChange}
+          onDelete={openDelete}
         />
       </MotionReveal>
 
@@ -306,13 +371,79 @@ export function ProductsPage() {
         title="Deactivate product?"
         description={
           statusTarget
-            ? `${statusTarget.name || 'This product'} will be hidden from active lists. You can reactivate it later.`
+            ? `${statusTarget.name || 'This product'} will be hidden from active lists and POS sync. You can reactivate it later.`
             : undefined
         }
         confirmLabel="Deactivate"
         loading={mutating}
         onConfirm={handleConfirmDeactivate}
       />
+
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null)
+            setDeleteInfo(null)
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete product?</DialogTitle>
+            <DialogDescription>
+              {deleteTarget
+                ? deleteIsActive
+                  ? `${deleteTarget.name || 'This product'} can be deactivated (keeps history) or permanently removed when eligible.`
+                  : `${deleteTarget.name || 'This product'} is inactive. ${
+                      canPermanentDelete
+                        ? 'You can permanently remove it from the catalog.'
+                        : 'It cannot be permanently deleted because it has linked records or stock.'
+                    }`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          {deleteInfo?.reason && !canPermanentDelete && Number(deleteTarget?.quantity ?? 0) === 0 ? (
+            <p className="text-xs text-slate-500">{deleteInfo.reason}</p>
+          ) : null}
+          <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={deleteLoading || mutating}
+              className="w-full sm:w-auto"
+              onClick={() => {
+                setDeleteTarget(null)
+                setDeleteInfo(null)
+              }}
+            >
+              Cancel
+            </Button>
+            {deleteIsActive ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={deleteLoading || mutating}
+                className="w-full sm:w-auto"
+                onClick={handleDeactivateFromDelete}
+              >
+                {deleteLoading ? 'Please wait…' : 'Deactivate'}
+              </Button>
+            ) : null}
+            {canPermanentDelete ? (
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={deleteLoading || mutating}
+                className="w-full sm:w-auto"
+                onClick={handlePermanentDelete}
+              >
+                {deleteLoading ? 'Please wait…' : 'Permanently delete'}
+              </Button>
+            ) : null}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

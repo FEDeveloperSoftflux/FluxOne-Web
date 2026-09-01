@@ -171,8 +171,6 @@ export const updateProduct = createAsyncThunk(
     const { json, image } = splitProductWrite(fields, { withConfirmed: false })
     const patchBody = { ...json }
     delete patchBody.confirmed
-    delete patchBody.categoryId
-    delete patchBody.subcategoryId
     const result = await apiClient.patch(endpoints.products.update(id), patchBody)
     if (!result.success) return rejectWithValue(result.error || 'Update failed')
     if (image) {
@@ -200,13 +198,25 @@ export const setProductStatus = createAsyncThunk(
   },
 )
 
+export const fetchProductDeleteInfo = createAsyncThunk(
+  'products/fetchDeleteInfo',
+  async (id, { rejectWithValue }) => {
+    const result = await apiClient.get(endpoints.products.deleteInfo(id))
+    if (!result.success) return rejectWithValue(result.error || 'Failed to load delete info')
+    return result.data || {}
+  },
+)
+
 export const deleteProduct = createAsyncThunk(
   'products/delete',
-  async (id, { getState, dispatch, rejectWithValue }) => {
-    const result = await apiClient.delete(endpoints.products.remove(id))
+  async ({ id, permanent = false }, { getState, dispatch, rejectWithValue }) => {
+    const path = permanent
+      ? `${endpoints.products.remove(id)}?permanent=true`
+      : endpoints.products.remove(id)
+    const result = await apiClient.delete(path)
     if (!result.success) return rejectWithValue(result.error || 'Delete failed')
     await dispatch(fetchProducts(getState().products.filters))
-    return { success: true }
+    return { success: true, permanent }
   },
 )
 
@@ -350,7 +360,8 @@ const productsSlice = createSlice({
         patch.q !== undefined ||
         patch.type !== undefined ||
         patch.categoryId !== undefined ||
-        patch.subcategoryId !== undefined
+        patch.subcategoryId !== undefined ||
+        patch.status !== undefined
       if (resetsPage && patch.page === undefined) next.page = 1
       state.filters = next
     },

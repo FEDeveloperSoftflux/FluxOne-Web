@@ -14,6 +14,7 @@ import {
   setProductStatus as setProductStatusThunk,
   deleteProduct as deleteProductThunk,
   exportProductsCsv,
+  fetchProductDeleteInfo as fetchProductDeleteInfoThunk,
   importProducts as importProductsThunk,
   scanBarcode as scanBarcodeThunk,
   fetchProductDetail as fetchProductDetailThunk,
@@ -113,7 +114,13 @@ export function useProducts(initialFilters = EMPTY_FILTERS, options = {}) {
   )
 
   const deleteProduct = useCallback(
-    (id) => asResult(dispatch(deleteProductThunk(id)).unwrap()),
+    ({ id, permanent = false }) =>
+      asResult(dispatch(deleteProductThunk({ id, permanent })).unwrap()),
+    [dispatch],
+  )
+
+  const fetchProductDeleteInfo = useCallback(
+    (id) => asResult(dispatch(fetchProductDeleteInfoThunk(id)).unwrap()),
     [dispatch],
   )
 
@@ -184,6 +191,7 @@ export function useProducts(initialFilters = EMPTY_FILTERS, options = {}) {
     updateProduct,
     setProductStatus,
     deleteProduct,
+    fetchProductDeleteInfo,
     importProducts,
     scanBarcode,
     fetchProductDetail,

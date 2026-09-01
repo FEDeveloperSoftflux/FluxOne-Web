@@ -125,18 +125,19 @@ export async function getStaffScores(req, res) {
       `
         SELECT 
           s.id AS "staffId",
-          s.full_name AS "fullName",
+          u.full_name AS "fullName",
           s.image_url AS "imageUrl",
           s.designation_id AS "designationId",
           d.name AS "designation",
           COALESCE(ROUND(AVG((ps.points / ss.max_points) * 100), 2), 0) AS "rating"
         FROM staff s
+        LEFT JOIN users u ON u.id = s.user_id AND u.tenant_id = s.tenant_id
         LEFT JOIN designations d ON d.id = s.designation_id
         LEFT JOIN performance_scores ps ON ps.staff_id = s.id AND ps.tenant_id = s.tenant_id
         LEFT JOIN scoring_scales ss ON ss.id = ps.scale_id AND ss.tenant_id = s.tenant_id
-        WHERE s.tenant_id = $1 AND s.status = 'open'
+        WHERE s.tenant_id = $1 AND s.status = 'active'
         GROUP BY s.id, d.name
-        ORDER BY s.full_name ASC
+        ORDER BY u.full_name ASC
       `,
     )
     return success(res, rows)

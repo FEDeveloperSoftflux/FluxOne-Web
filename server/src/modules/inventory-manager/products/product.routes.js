@@ -5,6 +5,7 @@ import {
   addProduct,
   categories,
   detail,
+  deleteInfo,
   importItems,
   offers,
   patchCategory,
@@ -24,6 +25,7 @@ import {
   categoryIdParamsSchema,
   createCategorySchema,
   createProductSchema,
+  deleteProductSchema,
   importItemsSchema,
   listCatalogSchema,
   productIdParamsSchema,
@@ -82,6 +84,7 @@ router.post(
 )
 router.post('/import', requirePermission('items:write'), validate(importItemsSchema), asyncHandler(importItems))
 router.post('/scan', requirePermission('items:read'), validate(scanItemSchema), asyncHandler(scan))
+router.get('/:id/delete-info', requirePermission('items:read'), validate(productIdParamsSchema), asyncHandler(deleteInfo))
 router.get('/:id', requirePermission('items:read'), validate(productIdParamsSchema), asyncHandler(detail))
 router.get(
   '/:id/barcode',
@@ -99,7 +102,7 @@ router.patch(
 router.delete(
   '/:id',
   requirePermission('items:write'),
-  validate(productIdParamsSchema),
+  validate(deleteProductSchema),
   asyncHandler(remove),
 )
 
