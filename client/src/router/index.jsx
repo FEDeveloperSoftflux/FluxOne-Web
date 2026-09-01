@@ -32,6 +32,16 @@ import { BranchInventoryPage } from '@/pages/branch/BranchInventoryPage'
 import { ReportsPage } from '@/pages/branch/ReportsPage'
 import { ResourcesPage } from '@/pages/branch/ResourcesPage'
 import { DiscountsPage } from '@/pages/branch/DiscountsPage'
+import { AdminAuthGate } from '@/router/guards/AdminAuthGate'
+import { AdminLayout } from '@/layouts/AdminLayout'
+import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage'
+import { ReportsPage as AdminReportsPage } from '@/pages/admin/ReportsPage'
+import { BranchesPage as AdminBranchesPage } from '@/pages/admin/BranchesPage'
+import { InvoicesPage as AdminInvoicesPage } from '@/pages/admin/InvoicesPage'
+import { TaxProfitPage as AdminTaxProfitPage } from '@/pages/admin/TaxProfitPage'
+import { CompanyPage as AdminCompanyPage } from '@/pages/admin/CompanyPage'
+import { SettingsPage as AdminSettingsPage } from '@/pages/admin/SettingsPage'
+import { AdminProfilePage } from '@/pages/admin/AdminProfilePage'
 import { useAuthSession } from '@/hooks/useAuthSession'
 import CategoriesPage from '@/pages/inventory/CategoriesPage'
 
@@ -43,6 +53,26 @@ function ProfileRedirect() {
 const router = createBrowserRouter([
   { path: PATHS.splash, element: <SplashPage /> },
   { path: PATHS.login, element: <LoginPage /> },
+  {
+    path: PATHS.admin.root,
+    element: <AdminAuthGate />,
+    children: [
+      {
+        element: <AdminLayout />,
+        children: [
+          { index: true, element: <AdminDashboardPage /> },
+          { path: 'dashboard', element: <AdminDashboardPage /> },
+          { path: 'reports', element: <AdminReportsPage /> },
+          { path: 'branches', element: <AdminBranchesPage /> },
+          { path: 'invoices', element: <AdminInvoicesPage /> },
+          { path: 'tax-profit', element: <AdminTaxProfitPage /> },
+          { path: 'company', element: <AdminCompanyPage /> },
+          { path: 'settings', element: <AdminSettingsPage /> },
+          { path: 'profile', element: <AdminProfilePage /> },
+        ],
+      },
+    ],
+  },
   {
     element: <AuthGate />,
     children: [

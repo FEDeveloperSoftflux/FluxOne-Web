@@ -34,13 +34,26 @@ export const PATHS = {
     home: '/workspace',
     profile: '/workspace/profile',
   },
+  admin: {
+    root: '/admin',
+    dashboard: '/admin/dashboard',
+    reports: '/admin/reports',
+    branches: '/admin/branches',
+    invoices: '/admin/invoices',
+    taxProfit: '/admin/tax-profit',
+    company: '/admin/company',
+    settings: '/admin/settings',
+    profile: '/admin/profile',
+  },
 }
 
+export const ADMIN_ROLES = ['b2b_owner']
 export const INVENTORY_ROLES = ['inventory_manager', 'b2b_admin']
 export const BRANCH_ROLES = ['branch_manager']
 export const PHASE2_ROLES = ['production_staff', 'delivery_staff']
 
 export function homePathForRole(role) {
+  if (ADMIN_ROLES.includes(role)) return PATHS.admin.dashboard
   if (INVENTORY_ROLES.includes(role)) return PATHS.inventory.root
   if (BRANCH_ROLES.includes(role)) return PATHS.branch.root
   if (PHASE2_ROLES.includes(role)) return PATHS.workspace.root
@@ -49,6 +62,7 @@ export function homePathForRole(role) {
 
 // Profile lives inside each role layout so the top nav stays visible.
 export function profilePathForRole(role) {
+  if (ADMIN_ROLES.includes(role)) return PATHS.admin.profile
   if (INVENTORY_ROLES.includes(role)) return PATHS.inventory.profile
   if (BRANCH_ROLES.includes(role)) return PATHS.branch.profile
   if (PHASE2_ROLES.includes(role)) return PATHS.workspace.profile

@@ -9,7 +9,9 @@ import { useAuthSession } from '@/hooks/useAuthSession'
 import { BRAND, DEMO_ACCOUNTS } from '@/lib/constants'
 import { clearAuthError } from '@/rtk/features/auth/authSlice'
 import { useAppDispatch } from '@/rtk/hooks'
-import { homePathForRole } from '@/router/paths'
+import { homePathForRole, PATHS } from '@/router/paths'
+import { validateAdminLogin, setAdminSession, ADMIN_CREDENTIALS } from '@/config/adminAuth.config'
+import { toastSuccess } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
 export function LoginForm() {
@@ -45,6 +47,12 @@ export function LoginForm() {
     clearErrors()
   }
 
+  function fillAdminDemo() {
+    setId(ADMIN_CREDENTIALS.id)
+    setPassword(ADMIN_CREDENTIALS.password)
+    clearErrors()
+  }
+
   async function onSubmit(event) {
     event.preventDefault()
     clearErrors()
@@ -59,6 +67,16 @@ export function LoginForm() {
       return
     }
 
+    // 1. Check if dummy Admin (B2B Owner) credentials entered
+    const adminAuth = validateAdminLogin(loginId, password)
+    if (adminAuth.success) {
+      setAdminSession(adminAuth.user)
+      toastSuccess('Welcome to Admin Dashboard')
+      navigate(PATHS.admin.dashboard, { replace: true })
+      return
+    }
+
+    // 2. Otherwise proceed with standard backend authentication
     try {
       const data = await login({ id: loginId, password })
       navigate(homePathForRole(data?.user?.role), { replace: true })
@@ -186,7 +204,24 @@ export function LoginForm() {
           >
             <div className="overflow-hidden">
               <div className="border-t border-border px-3 pt-2 pb-3">
-                <ul className="max-h-44 space-y-1.5 overflow-y-auto">
+                <ul className="max-h-48 space-y-1.5 overflow-y-auto">
+                  <li>
+                    <button
+                      type="button"
+                      onClick={fillAdminDemo}
+                      className="w-full cursor-pointer rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-white active:scale-[0.99]"
+                    >
+                      <span className="font-medium text-foreground">
+                        Admin
+                        <span className="ml-1 font-normal text-muted-foreground">
+                          (B2B Owner)
+                        </span>
+                      </span>
+                      <span className="mt-0.5 block truncate text-muted-foreground">
+                        {ADMIN_CREDENTIALS.id}
+                      </span>
+                    </button>
+                  </li>
                   {DEMO_ACCOUNTS.map((account) => (
                     <li key={`${account.tenantSlug}-${account.id}`}>
                       <button

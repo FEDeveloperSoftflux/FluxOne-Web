@@ -1,0 +1,167 @@
+import { motion, useReducedMotion } from 'motion/react'
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  CircleDollarSign,
+  CalendarCheck,
+  TrendingUp,
+  Receipt,
+  Sparkles,
+} from 'lucide-react'
+import { BRAND } from '@/lib/constants'
+import { cn } from '@/lib/utils'
+
+const KPI_CONFIG = [
+  {
+    key: 'todayEarning',
+    title: 'Today Earning',
+    subtitle: 'Consolidated Gross',
+    icon: CircleDollarSign,
+    format: (data) => data?.formatted || 'Rs. 0',
+    subtext: '+14.8% vs. yesterday',
+    isUp: true,
+    progress: 88,
+    targetText: 'Daily Goal: Rs. 500k',
+    gradient: 'from-purple-500/10 via-purple-500/5 to-transparent',
+    iconGradient: 'from-purple-600 to-indigo-700',
+  },
+  {
+    key: 'lastMonthEarning',
+    title: 'Last Month Earning',
+    subtitle: 'Closed 30-Day Period',
+    icon: CalendarCheck,
+    format: (data) => data?.formatted || 'Rs. 0',
+    subtext: '+8.6% vs. prior month',
+    isUp: true,
+    progress: 92,
+    targetText: 'Target: Rs. 12.0 M',
+    gradient: 'from-blue-500/10 via-blue-500/5 to-transparent',
+    iconGradient: 'from-blue-600 to-cyan-600',
+  },
+  {
+    key: 'thisYearEarning',
+    title: 'This Year Earning',
+    subtitle: 'YTD 2026 Consolidated',
+    icon: TrendingUp,
+    format: (data) => data?.formatted || 'Rs. 0',
+    subtext: '+22.4% annual growth',
+    isUp: true,
+    progress: 86.9,
+    targetText: 'Goal: Rs. 100 M (86.9%)',
+    gradient: 'from-emerald-500/10 via-emerald-500/5 to-transparent',
+    iconGradient: 'from-emerald-600 to-teal-700',
+  },
+  {
+    key: 'totalSale',
+    title: 'Total Sale',
+    subtitle: 'All 4 Branches Combined',
+    icon: Receipt,
+    format: (data) => data?.formatted || 'Rs. 0',
+    subtext: '46,890 orders logged',
+    isUp: true,
+    progress: 100,
+    targetText: 'Avg Ticket: Rs. 3,163',
+    gradient: 'from-amber-500/10 via-amber-500/5 to-transparent',
+    iconGradient: 'from-amber-500 to-orange-600',
+  },
+]
+
+export function AdminKpiCards({ kpis = {}, className }) {
+  const reduceMotion = useReducedMotion()
+
+  return (
+    <div className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4', className)}>
+      {KPI_CONFIG.map((config, index) => {
+        const Icon = config.icon
+        const item = kpis[config.key] || {}
+        const isUp = item.isPositive ?? config.isUp
+        const displayValue = config.format(item)
+
+        return (
+          <motion.article
+            key={config.key}
+            initial={reduceMotion ? false : { opacity: 0, y: 15 }}
+            whileInView={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 0.4, delay: index * 0.06, ease: [0.22, 1, 0.36, 1] }}
+            whileHover={reduceMotion ? undefined : { y: -4, transition: { duration: 0.2 } }}
+            className="group relative cursor-pointer overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-5 shadow-[0_4px_20px_rgba(15,23,42,0.03)] transition-all duration-300 hover:border-purple-300 hover:shadow-[0_12px_32px_rgba(142,35,143,0.09)]"
+          >
+            {/* Background subtle gradient */}
+            <div
+              className={cn(
+                'pointer-events-none absolute inset-0 bg-gradient-to-br opacity-50 transition-opacity group-hover:opacity-100',
+                config.gradient,
+              )}
+            />
+
+            {/* Top glowing accent line */}
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 h-1"
+              style={{ background: `linear-gradient(90deg, ${BRAND.purple}, ${BRAND.deep})` }}
+            />
+
+            <div className="relative z-10">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
+                    {config.title}
+                  </p>
+                  <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+                    {displayValue}
+                  </h3>
+                </div>
+
+                <div
+                  className={cn(
+                    'flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-sm transition-transform duration-300 group-hover:scale-105',
+                    config.iconGradient,
+                  )}
+                >
+                  <Icon className="size-5" strokeWidth={2} />
+                </div>
+              </div>
+
+              {/* Growth Badge & Subtext */}
+              <div className="mt-3.5 flex items-center justify-between gap-2">
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-bold ring-1 ring-inset',
+                    isUp
+                      ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                      : 'bg-rose-50 text-rose-700 ring-rose-200',
+                  )}
+                >
+                  {isUp ? <ArrowUpRight className="size-3.5" /> : <ArrowDownRight className="size-3.5" />}
+                  {item.changePct ? `+${item.changePct}%` : config.subtext.split(' ')[0]}
+                </span>
+
+                <span className="text-[11px] font-medium text-slate-500 truncate">
+                  {item.comparisonText || config.subtext}
+                </span>
+              </div>
+
+              {/* Micro Progress Indicator */}
+              <div className="mt-3 pt-2.5 border-t border-slate-100">
+                <div className="flex items-center justify-between text-[10px] font-semibold text-slate-400 mb-1">
+                  <span>{config.targetText}</span>
+                  <span className="text-purple-700 font-bold">{config.progress}%</span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className="h-full rounded-full transition-all duration-700"
+                    style={{
+                      width: `${config.progress}%`,
+                      background: `linear-gradient(90deg, ${BRAND.purple}, ${BRAND.deep})`,
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </motion.article>
+        )
+      })}
+    </div>
+  )
+}
+export default AdminKpiCards
