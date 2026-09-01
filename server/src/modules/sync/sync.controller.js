@@ -1,37 +1,88 @@
-import { z } from 'zod'
-import { ingestSyncEvent, listSyncEvents } from './sync.model.js'
+import {
+  buildBootstrapSnapshot,
+  buildDeltaSnapshot,
+  ingestSyncEvent,
+  listSyncEvents,
+} from './sync.model.js'
+import {
+  bootstrapQuerySchema,
+  deltaQuerySchema,
+  normalizeSyncEventPayload,
+  parseSchemaOrThrow,
+  pushBodySchema,
+} from './sync.validator.js'
+import { resolveSyncPullBranchId, resolveSyncPushBranchId } from './sync.access.js'
+import { mapSnapshotForPos } from './sync.mapper.js'
 import { success } from '../../utils/response.util.js'
 
-const pushSchema = z.object({
-  events: z
-    .array(
-      z.object({
-        clientEventId: z.string().min(1),
-        eventType: z.enum(['sale', 'refund', 'cashier_log', 'attendance']),
-        payload: z.record(z.string(), z.any()),
-        deviceId: z.string().optional(),
-      }),
-    )
-    .min(1),
-})
-
 export async function push(req, res) {
-  const parsed = pushSchema.parse(req.body)
-  const saved = []
+  const parsed = parseSchemaOrThrow(pushBodySchema, req.body, 'Push body')
+  const branchId = resolveSyncPushBranchId(req, parsed.branchId)
+
+  const accepted = []
+  const rejected = []
+  const events = []
 
   for (const event of parsed.events) {
-    const row = await ingestSyncEvent(req.tenantId, {
+    const normalized = {
       ...event,
-      branchId: req.user.branchId,
-      syncedBy: req.user.id,
-    }, req.user.id)
-    saved.push(row)
+      deviceId: event.deviceId || parsed.deviceId || null,
+      payload: normalizeSyncEventPayload(event.eventType, event.payload),
+    }
+
+    try {
+      const row = await ingestSyncEvent(
+        req.tenantId,
+        {
+          ...normalized,
+          branchId,
+          syncedBy: req.user.id,
+        },
+        req.user.id,
+      )
+      events.push(row)
+      accepted.push(row.clientEventId)
+    } catch (err) {
+      rejected.push({
+        clientEventId: event.clientEventId,
+        reason: err.message || 'Event rejected',
+      })
+    }
   }
 
-  return success(res, { accepted: saved.length, events: saved }, 202)
+  return success(
+    res,
+    {
+      accepted,
+      rejected,
+      events,
+      acceptedCount: accepted.length,
+    },
+    202,
+  )
 }
 
-export async function pull(req, res) {
+export async function bootstrap(req, res) {
+  const { branchId } = parseSchemaOrThrow(bootstrapQuerySchema, req.query, 'Bootstrap query')
+  const resolvedBranchId = resolveSyncPullBranchId(req, branchId)
+  const snapshot = await buildBootstrapSnapshot(req.tenantId, resolvedBranchId)
+  return success(res, mapSnapshotForPos(snapshot))
+}
+
+export async function delta(req, res) {
+  const { branchId, since } = parseSchemaOrThrow(deltaQuerySchema, req.query, 'Delta query')
+  const resolvedBranchId = resolveSyncPullBranchId(req, branchId)
+  const snapshot = await buildDeltaSnapshot(req.tenantId, resolvedBranchId, since)
+  return success(res, mapSnapshotForPos(snapshot))
+}
+
+/** Cloud pos_sync_events audit log — not POS catalog. */
+export async function events(req, res) {
   const rows = await listSyncEvents(req.tenantId, { since: req.query.since })
   return success(res, rows)
+}
+
+/** @deprecated Use GET /api/sync/bootstrap and /api/sync/delta for POS catalog sync. */
+export async function pull(req, res) {
+  return events(req, res)
 }
