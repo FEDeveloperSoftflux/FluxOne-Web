@@ -1,8 +1,18 @@
 import { useEffect, useState } from 'react'
-import { Search, Printer, AlertTriangle } from 'lucide-react'
+import {
+  Search,
+  Printer,
+  AlertTriangle,
+  Receipt,
+  CircleDollarSign,
+  CreditCard,
+  ArrowDownRight,
+  TrendingUp,
+} from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
+import { StatCard } from '@/components/shared/StatsCards'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -117,32 +127,41 @@ export function SalesPage() {
         />
       </MotionHeader>
 
-      {/* KPI Cards (Matches exact visual styles from layout) */}
+      {/* Reusable KPI Stat Cards (4 Columns) */}
       <MotionReveal delay={0.02}>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          {/* Card 1: Transactions (Solid Purple) & Returns (White below) */}
-          <div className="space-y-4">
-            <div className="rounded-2xl p-5 shadow-sm text-white flex flex-col justify-between h-[100px]" style={{ backgroundColor: BRAND.purple }}>
-              <span className="text-xs font-bold uppercase tracking-wider opacity-90">Transactions</span>
-              <span className="text-3xl font-extrabold">{kpis.transactionCount}</span>
-            </div>
-            <div className="rounded-2xl p-5 shadow-sm bg-white border border-border flex flex-col justify-between h-[100px]">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Returns</span>
-              <span className="text-3xl font-extrabold text-slate-900">Rs. {formatPrice(kpis.totalReturns)}</span>
-            </div>
-          </div>
-
-          {/* Card 2: Net Sales */}
-          <div className="rounded-2xl p-5 shadow-sm bg-white border border-border flex flex-col justify-between h-[100px] md:h-auto">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Net Sales</span>
-            <span className="text-3xl font-extrabold text-slate-900 mt-auto">Rs. {formatPrice(kpis.totalSales)}</span>
-          </div>
-
-          {/* Card 3: Paid */}
-          <div className="rounded-2xl p-5 shadow-sm bg-white border border-border flex flex-col justify-between h-[100px] md:h-auto">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Paid</span>
-            <span className="text-3xl font-extrabold text-slate-900 mt-auto">Rs. {formatPrice(kpis.totalPaid)}</span>
-          </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            index={0}
+            label="Transactions"
+            value={kpis.transactionCount || sales.length || 0}
+            subtitle="Total sales orders processed"
+            badge="Orders"
+            icon={Receipt}
+          />
+          <StatCard
+            index={1}
+            label="Net Sales"
+            value={`Rs. ${formatPrice(kpis.totalSales)}`}
+            subtitle="Gross transaction revenue"
+            badge="Gross"
+            icon={CircleDollarSign}
+          />
+          <StatCard
+            index={2}
+            label="Paid Amount"
+            value={`Rs. ${formatPrice(kpis.totalPaid)}`}
+            subtitle="Settled cash & POS cards"
+            badge="Settled"
+            icon={CreditCard}
+          />
+          <StatCard
+            index={3}
+            label="Returns & Refunds"
+            value={`Rs. ${formatPrice(kpis.totalReturns)}`}
+            subtitle={`${kpis.totalRefunds || 0} refunds recorded`}
+            badge="Returns"
+            icon={ArrowDownRight}
+          />
         </div>
       </MotionReveal>
 

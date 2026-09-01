@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog'
 import { BRAND } from '@/lib/constants'
 import { toastSuccess, toastError } from '@/lib/toast'
+import { validatePercentage } from '@/lib/validation/formValidators'
 import {
   INITIAL_TAX_PROFIT_PRODUCTS,
   TAX_PROFIT_CATEGORIES,
@@ -94,12 +95,13 @@ export function TaxProfitPage() {
   // Apply Bulk Profit %
   function handleApplyBulkProfit(e) {
     e.preventDefault()
-    const profitNum = Number(bulkProfitValue)
-    if (isNaN(profitNum) || profitNum < 0) {
-      toastError('Please enter a valid profit percentage')
+    const err = validatePercentage(bulkProfitValue, { min: 0, max: 100, fieldName: 'Profit percentage' })
+    if (err) {
+      toastError(err)
       return
     }
 
+    const profitNum = Number(bulkProfitValue)
     setProducts((prev) =>
       prev.map((p) => {
         if (selectedIds.includes(p.id)) {
@@ -118,12 +120,13 @@ export function TaxProfitPage() {
   // Apply Bulk Tax %
   function handleApplyBulkTax(e) {
     e.preventDefault()
-    const taxNum = Number(bulkTaxValue)
-    if (isNaN(taxNum) || taxNum < 0) {
-      toastError('Please enter a valid tax percentage')
+    const err = validatePercentage(bulkTaxValue, { min: 0, max: 100, fieldName: 'Tax percentage' })
+    if (err) {
+      toastError(err)
       return
     }
 
+    const taxNum = Number(bulkTaxValue)
     setProducts((prev) =>
       prev.map((p) => {
         if (selectedIds.includes(p.id)) {

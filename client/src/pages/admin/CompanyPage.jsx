@@ -18,6 +18,11 @@ import {
 import { BRAND } from '@/lib/constants'
 import { toastSuccess, toastError } from '@/lib/toast'
 import {
+  sanitizePhoneInput,
+  validatePhone,
+  validateUrl,
+} from '@/lib/validation/formValidators'
+import {
   INITIAL_COMPANY_DETAILS,
   INITIAL_POLICIES_DATA,
 } from '@/data/adminCompanyMock'
@@ -56,6 +61,51 @@ export function CompanyPage() {
   // Save Company Details
   function handleSaveCompanyDetails(e) {
     e.preventDefault()
+    if (!companyDetails.name.trim()) {
+      toastError('Please enter the registered company name')
+      return
+    }
+
+    if (!companyDetails.contactNumbers.trim()) {
+      toastError('Please provide company contact numbers')
+      return
+    }
+
+    // Validate WhatsApp number if provided
+    if (companyDetails.whatsappNumber?.trim()) {
+      const waErr = validatePhone(companyDetails.whatsappNumber, {
+        required: false,
+        fieldName: 'WhatsApp number',
+      })
+      if (waErr) {
+        toastError(waErr)
+        return
+      }
+    }
+
+    // Validate Social URLs
+    if (companyDetails.facebookUrl?.trim()) {
+      const fbErr = validateUrl(companyDetails.facebookUrl, {
+        required: false,
+        fieldName: 'Facebook URL',
+      })
+      if (fbErr) {
+        toastError(fbErr)
+        return
+      }
+    }
+
+    if (companyDetails.instagramUrl?.trim()) {
+      const igErr = validateUrl(companyDetails.instagramUrl, {
+        required: false,
+        fieldName: 'Instagram URL',
+      })
+      if (igErr) {
+        toastError(igErr)
+        return
+      }
+    }
+
     toastSuccess('Company details and registration credentials saved successfully!')
   }
 
@@ -244,10 +294,11 @@ export function CompanyPage() {
                     onChange={(e) =>
                       setCompanyDetails({
                         ...companyDetails,
-                        whatsappNumber: e.target.value,
+                        whatsappNumber: sanitizePhoneInput(e.target.value),
                       })
                     }
-                    placeholder="+92 300 1234567"
+                    placeholder="03001234567"
+                    maxLength={13}
                   />
                 </div>
 

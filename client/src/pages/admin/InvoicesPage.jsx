@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MotionHeader, MotionReveal } from '@/components/shared/MotionReveal'
+import { StatCard } from '@/components/shared/StatsCards'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { NativeSelect } from '@/components/ui/select'
@@ -28,6 +29,22 @@ import {
   Building,
   Layers,
 } from 'lucide-react'
+
+const MONTHS_OPTIONS = [
+  { value: 'all', label: 'All Months' },
+  { value: '01', label: 'January' },
+  { value: '02', label: 'February' },
+  { value: '03', label: 'March' },
+  { value: '04', label: 'April' },
+  { value: '05', label: 'May' },
+  { value: '06', label: 'June' },
+  { value: '07', label: 'July' },
+  { value: '08', label: 'August' },
+  { value: '09', label: 'September' },
+  { value: '10', label: 'October' },
+  { value: '11', label: 'November' },
+  { value: '12', label: 'December' },
+]
 
 export function InvoicesPage() {
   const [invoices] = useState(INITIAL_INVOICES_DATA)
@@ -193,41 +210,30 @@ export function InvoicesPage() {
       {/* Top Subscription Summary Stats */}
       <MotionReveal delay={0.05}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs transition-all hover:bg-[#f6ecf8] hover:border-[#dfc4e4]">
-            <span className="text-[11px] font-bold text-purple-900 uppercase tracking-wider">
-              Active Tier
-            </span>
-            <p className="text-xl font-extrabold text-slate-900 mt-1">
-              Enterprise Multi-Branch
-            </p>
-            <span className="text-xs text-slate-500 font-medium mt-0.5 block">
-              4 Active Stores · Unlimited POS Terminals
-            </span>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs transition-all hover:bg-[#f6ecf8] hover:border-[#dfc4e4]">
-            <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-              Next Billing Renewal
-            </span>
-            <p className="text-xl font-extrabold text-slate-900 mt-1">
-              01 Oct 2026
-            </p>
-            <span className="text-xs text-emerald-700 font-semibold mt-0.5 block flex items-center gap-1">
-              <CheckCircle2 className="size-3.5" /> Auto-debit active (HBL Corporate)
-            </span>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs transition-all hover:bg-[#f6ecf8] hover:border-[#dfc4e4]">
-            <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-              YTD Total Invoiced
-            </span>
-            <p className="text-xl font-extrabold text-slate-900 mt-1">
-              Rs. 250,000
-            </p>
-            <span className="text-xs text-slate-500 font-medium mt-0.5 block">
-              6 Invoices logged (2026)
-            </span>
-          </div>
+          <StatCard
+            index={0}
+            label="Active Tier"
+            value="Enterprise Multi-Branch"
+            subtitle="4 Active Stores · Unlimited POS Terminals"
+            badge="4 Branches"
+            icon={Building}
+          />
+          <StatCard
+            index={1}
+            label="Next Billing Renewal"
+            value="01 Oct 2026"
+            subtitle="Auto-debit active via HBL Corporate"
+            badge="Auto-Pay"
+            icon={Calendar}
+          />
+          <StatCard
+            index={2}
+            label="YTD Total Invoiced"
+            value="Rs. 367,000"
+            subtitle="9 Invoices logged (2026 Season)"
+            badge="YTD 2026"
+            icon={Receipt}
+          />
         </div>
       </MotionReveal>
 
@@ -255,13 +261,11 @@ export function InvoicesPage() {
                 onChange={(e) => setSelectedMonth(e.target.value)}
                 className="h-7 border-0 bg-transparent py-0 text-xs font-semibold text-slate-800 shadow-none focus:ring-0"
               >
-                <option value="all">All Months</option>
-                <option value="09">September</option>
-                <option value="08">August</option>
-                <option value="07">July</option>
-                <option value="06">June</option>
-                <option value="05">May</option>
-                <option value="12">December</option>
+                {MONTHS_OPTIONS.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
               </NativeSelect>
             </div>
 

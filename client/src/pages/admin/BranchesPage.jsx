@@ -17,6 +17,11 @@ import {
 } from '@/components/ui/dialog'
 import { BRAND } from '@/lib/constants'
 import { toastSuccess, toastError } from '@/lib/toast'
+import {
+  sanitizePhoneInput,
+  validatePhone,
+  validateEmail,
+} from '@/lib/validation/formValidators'
 import { INITIAL_BRANCHES_DATA } from '@/data/adminBranchesMock'
 import {
   Plus,
@@ -133,9 +138,32 @@ export function BranchesPage() {
       toastError('Please fill in Branch Name and Location')
       return
     }
-    if (!formData.managerName.trim() || !formData.managerEmail.trim()) {
-      toastError('Please fill in Branch Manager Name and Email')
+    if (!formData.managerName.trim()) {
+      toastError('Please fill in Branch Manager Name')
       return
+    }
+
+    // Email validation
+    const emailErr = validateEmail(formData.managerEmail, { fieldName: 'Manager Email' })
+    if (emailErr) {
+      toastError(emailErr)
+      return
+    }
+
+    // Primary Phone validation
+    const phoneErr = validatePhone(formData.managerContact, { required: true, fieldName: 'Primary Contact Number' })
+    if (phoneErr) {
+      toastError(phoneErr)
+      return
+    }
+
+    // Optional Secondary Phone validation
+    if (formData.managerOtherContact?.trim()) {
+      const otherPhoneErr = validatePhone(formData.managerOtherContact, { required: false, fieldName: 'Other Contact Number' })
+      if (otherPhoneErr) {
+        toastError(otherPhoneErr)
+        return
+      }
     }
 
     if (editingBranch) {
@@ -510,12 +538,15 @@ export function BranchesPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="mgrContact" className="text-xs">Primary Contact Number *</Label>
+                  <Label htmlFor="mgrContact" className="text-xs">Primary Contact Number * (Digits only)</Label>
                   <Input
                     id="mgrContact"
-                    placeholder="+92 300 1234567"
+                    placeholder="03001234567 or +923001234567"
                     value={formData.managerContact}
-                    onChange={(e) => setFormData({ ...formData, managerContact: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, managerContact: sanitizePhoneInput(e.target.value) })
+                    }
+                    maxLength={13}
                     required
                   />
                 </div>
@@ -524,9 +555,12 @@ export function BranchesPage() {
                   <Label htmlFor="mgrOtherContact" className="text-xs">Other Contact Number (Optional)</Label>
                   <Input
                     id="mgrOtherContact"
-                    placeholder="+92 321 7654321"
+                    placeholder="03217654321"
                     value={formData.managerOtherContact}
-                    onChange={(e) => setFormData({ ...formData, managerOtherContact: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, managerOtherContact: sanitizePhoneInput(e.target.value) })
+                    }
+                    maxLength={13}
                   />
                 </div>
 

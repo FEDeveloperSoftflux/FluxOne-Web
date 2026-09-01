@@ -104,10 +104,10 @@ export function AdminKpiCards({ kpis = {}, className }) {
             <div className="relative z-10">
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-1">
-                  <p className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
+                  <p className="text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
                     {config.title}
                   </p>
-                  <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+                  <h3 className="text-2xl sm:text-3xl font-semibold tracking-tight text-slate-800">
                     {displayValue}
                   </h3>
                 </div>
@@ -118,7 +118,7 @@ export function AdminKpiCards({ kpis = {}, className }) {
                     config.iconGradient,
                   )}
                 >
-                  <Icon className="size-5" strokeWidth={2} />
+                  <Icon className="size-5" strokeWidth={1.75} />
                 </div>
               </div>
 
@@ -126,26 +126,26 @@ export function AdminKpiCards({ kpis = {}, className }) {
               <div className="mt-3.5 flex items-center justify-between gap-2">
                 <span
                   className={cn(
-                    'inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-bold ring-1 ring-inset',
+                    'inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset',
                     isUp
-                      ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-                      : 'bg-rose-50 text-rose-700 ring-rose-200',
+                      ? 'bg-purple-50 text-purple-900 ring-purple-200'
+                      : 'bg-slate-100 text-slate-700 ring-slate-200',
                   )}
                 >
-                  {isUp ? <ArrowUpRight className="size-3.5" /> : <ArrowDownRight className="size-3.5" />}
+                  {isUp ? <ArrowUpRight className="size-3.5 text-purple-700" /> : <ArrowDownRight className="size-3.5 text-slate-500" />}
                   {item.changePct ? `+${item.changePct}%` : config.subtext.split(' ')[0]}
                 </span>
 
-                <span className="text-[11px] font-medium text-slate-500 truncate">
+                <span className="text-[11px] font-normal text-slate-500 truncate">
                   {item.comparisonText || config.subtext}
                 </span>
               </div>
 
               {/* Micro Progress Indicator */}
               <div className="mt-3 pt-2.5 border-t border-slate-100">
-                <div className="flex items-center justify-between text-[10px] font-semibold text-slate-400 mb-1">
+                <div className="flex items-center justify-between text-[10px] font-medium text-slate-400 mb-1">
                   <span>{config.targetText}</span>
-                  <span className="text-purple-700 font-bold">{config.progress}%</span>
+                  <span className="text-purple-700 font-semibold">{config.progress}%</span>
                 </div>
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
                   <div
