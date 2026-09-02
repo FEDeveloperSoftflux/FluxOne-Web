@@ -68,6 +68,7 @@ const initialState = {
   error: null,
   catalog: catalogToState(peekProductCatalog()),
   bundleOptions: [],
+  bundleOptionsLoading: false,
 }
 
 // Load shared category / tax / offer catalog
@@ -398,8 +399,16 @@ const productsSlice = createSlice({
         state.items = []
         state.error = action.payload || action.error.message
       })
+      .addCase(loadBundleOptions.pending, (state) => {
+        state.bundleOptionsLoading = true
+      })
       .addCase(loadBundleOptions.fulfilled, (state, action) => {
+        state.bundleOptionsLoading = false
         state.bundleOptions = action.payload
+      })
+      .addCase(loadBundleOptions.rejected, (state) => {
+        state.bundleOptionsLoading = false
+        state.bundleOptions = []
       })
       .addCase(createProduct.pending, (state) => {
         state.mutating = true

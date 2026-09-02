@@ -42,6 +42,7 @@ export function useProducts(initialFilters = EMPTY_FILTERS, options = {}) {
     error,
     catalog: catalogRaw,
     bundleOptions,
+    bundleOptionsLoading,
   } = useAppSelector((state) => state.products)
 
   const catalog = useMemo(() => catalogForUi(catalogRaw), [catalogRaw])
@@ -181,6 +182,7 @@ export function useProducts(initialFilters = EMPTY_FILTERS, options = {}) {
     catalog,
     selectedCategorySubs,
     bundleOptions,
+    bundleOptionsLoading,
     updateFilters,
     setPage: (page) => updateFilters({ page }),
     reload: () => dispatch(fetchProducts(filtersRef.current)),

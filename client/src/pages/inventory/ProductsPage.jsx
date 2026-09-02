@@ -60,6 +60,7 @@ export function ProductsPage() {
     exportCsv,
     loadBundleOptions,
     bundleOptions,
+    bundleOptionsLoading,
   } = useProducts()
 
   const { localQ, onSearchChange } = useDebouncedSearch(updateFilters)
@@ -92,10 +93,10 @@ export function ProductsPage() {
     setFormMode('edit')
     setFormType(row.type || PRODUCT_TYPES.SINGLE)
     setEditing(row)
-    setFormOpen(true)
     if (row.type === PRODUCT_TYPES.BUNDLE) {
-      void loadBundleOptions()
+      await loadBundleOptions()
     }
+    setFormOpen(true)
     const detail = await fetchProductDetail(row.id)
     if (detail.success && detail.data) {
       setEditing(detail.data)
@@ -333,7 +334,8 @@ export function ProductsPage() {
         childrenByParent={catalog.childrenByParent}
         taxes={catalog.taxes}
         offers={catalog.offers}
-        catalogItems={bundleOptions.length ? bundleOptions : items}
+        catalogItems={bundleOptions}
+        catalogItemsLoading={bundleOptionsLoading}
         loading={mutating}
         onSubmit={handleSubmit}
         onPrintBarcode={handlePrintFromCreate}

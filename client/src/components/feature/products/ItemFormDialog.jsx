@@ -51,6 +51,7 @@ export function ItemFormDialog({
   taxes = [],
   offers = [],
   catalogItems = [],
+  catalogItemsLoading = false,
   loading = false,
   onSubmit,
   onPrintBarcode,
@@ -65,6 +66,7 @@ export function ItemFormDialog({
   const { captureBaseline, isDirty } = useFormBaseline(open)
 
   const type = isEdit ? form.type : productType
+  const isBundle = type === PRODUCT_TYPES.BUNDLE
 
   const subcategories = useMemo(() => {
     if (!form.categoryId || !childrenByParent) return []
@@ -112,6 +114,26 @@ export function ItemFormDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- categories seeded in separate effect
   }, [open, isEdit, initialProduct, productType])
 
+  // Bundle purchase/selling prices = sum of selected single-item prices × qty
+  useEffect(() => {
+    if (!open || !isBundle) return
+    let purchase = 0
+    let selling = 0
+    for (const row of form.bundleItems) {
+      const item = catalogItems.find((entry) => entry.id === row.itemId)
+      if (!item) continue
+      const qty = Number(row.quantity) || 1
+      purchase += Number(item.purchasePrice || 0) * qty
+      selling += Number(item.sellingPrice || 0) * qty
+    }
+    const nextPurchase = purchase > 0 ? String(Math.round(purchase * 100) / 100) : ''
+    const nextSelling = selling > 0 ? String(Math.round(selling * 100) / 100) : ''
+    setForm((prev) => {
+      if (prev.purchasePrice === nextPurchase && prev.sellingPrice === nextSelling) return prev
+      return { ...prev, purchasePrice: nextPurchase, sellingPrice: nextSelling }
+    })
+  }, [open, isBundle, form.bundleItems, catalogItems])
+
   // Re-seed categoryId only when create form still has none and parents load async
   // useEffect(() => {
   //   if (!open || isEdit) return
@@ -145,18 +167,13 @@ export function ItemFormDialog({
     }
     if (type === PRODUCT_TYPES.BUNDLE) {
       if (!form.bundleItems || form.bundleItems.length === 0) {
-        return 'Add at least one bundle item'
+        return 'Select at least one item for this bundle'
       }
-      const itemIds = []
       for (const row of form.bundleItems) {
         if (!row.itemId) return 'Select an item for each bundle line'
         if (!row.quantity || Number(row.quantity) <= 0) {
-          return 'Quantity must be greater than 0 for each bundle line'
+          return 'Quantity must be greater than 0 for each selected item'
         }
-        itemIds.push(row.itemId)
-      }
-      if (new Set(itemIds).size !== itemIds.length) {
-        return 'Each item can only appear once in a bundle'
       }
     }
     return null
@@ -232,6 +249,17 @@ export function ItemFormDialog({
   const dirty =
     step === 'success' ? false : isDirty(form) || step === 'confirm' || Boolean(confirmed)
 
+  const bundleReviewLines = useMemo(() => {
+    if (!isBundle) return []
+    return form.bundleItems
+      .map((row) => {
+        const item = catalogItems.find((entry) => entry.id === row.itemId)
+        if (!item) return null
+        return `${item.name} × ${row.quantity}`
+      })
+      .filter(Boolean)
+  }, [isBundle, form.bundleItems, catalogItems])
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange} dirty={dirty}>
       <DialogContent className="max-w-2xl">
@@ -279,6 +307,18 @@ export function ItemFormDialog({
                 </div>
               )}
 
+              {isBundle ? (
+                <div className="sm:col-span-2">
+                  <BundleItemPicker
+                    catalogItems={catalogItems}
+                    value={form.bundleItems}
+                    excludeId={initialProduct?.id}
+                    loading={catalogItemsLoading}
+                    onChange={(bundleItems) => patch('bundleItems', bundleItems)}
+                  />
+                </div>
+              ) : null}
+
               <div className="space-y-1.5 sm:col-span-2">
                 <Label htmlFor="product-name">Name</Label>
                 <Input
@@ -286,6 +326,43 @@ export function ItemFormDialog({
                   value={form.name}
                   onChange={(event) => patch('name', event.target.value)}
                   placeholder="Product name"
+                />
+              </div>
+
+              <ImageUploadField
+                id="product-image"
+                label="Image"
+                optionalLabel="(optional)"
+                value={form.image}
+                existingImageUrl={isEdit ? initialProduct?.imageUrl : null}
+                onChange={(file) => patch('image', file)}
+                className="sm:col-span-2"
+              />
+
+              <div className="space-y-1.5">
+                <Label htmlFor="product-scale">Scale</Label>
+                <NativeSelect
+                  id="product-scale"
+                  value={form.scale}
+                  onChange={(event) => patch('scale', event.target.value)}
+                >
+                  <option value="">Select Scale</option>
+                  {SCALE_OPTIONS.map((scale) => (
+                    <option key={scale} value={scale}>
+                      {scale}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="product-barcode-hint">Barcode</Label>
+                <Input
+                  id="product-barcode-hint"
+                  value={isEdit ? initialProduct?.barcode || '—' : ''}
+                  disabled
+                  placeholder="System auto-generated on create"
+                  className="bg-slate-50 font-mono text-slate-500"
                 />
               </div>
 
@@ -327,63 +404,45 @@ export function ItemFormDialog({
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="product-scale">Scale</Label>
-                <NativeSelect
-                  id="product-scale"
-                  value={form.scale}
-                  onChange={(event) => patch('scale', event.target.value)}
-                >
-                  <option value="">Select Scale</option>
-                  {SCALE_OPTIONS.map((scale) => (
-                    <option key={scale} value={scale}>
-                      {scale}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </div>
-
-              <ImageUploadField
-                id="product-image"
-                label="Image"
-                optionalLabel="(optional)"
-                value={form.image}
-                existingImageUrl={isEdit ? initialProduct?.imageUrl : null}
-                onChange={(file) => patch('image', file)}
-              />
-
-              <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="product-barcode-hint">Barcode</Label>
-                <Input
-                  id="product-barcode-hint"
-                  value={isEdit ? initialProduct?.barcode || '—' : ''}
-                  disabled
-                  placeholder="System auto-generated on create"
-                  className="bg-slate-50 font-mono text-slate-500"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="product-purchase">Purchase price</Label>
+                <Label htmlFor="product-purchase">
+                  {isBundle ? 'Purchase price (calculated)' : 'Purchase price'}
+                </Label>
                 <Input
                   id="product-purchase"
                   type="number"
                   min="0"
                   step="0.01"
                   value={form.purchasePrice}
+                  disabled={isBundle}
                   onChange={(event) => patch('purchasePrice', event.target.value)}
+                  className={isBundle ? 'bg-slate-50' : undefined}
                 />
+                {isBundle ? (
+                  <p className="text-[11px] text-slate-400">
+                    Sum of selected items&apos; purchase prices × quantity.
+                  </p>
+                ) : null}
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="product-selling">Selling price</Label>
+                <Label htmlFor="product-selling">
+                  {isBundle ? 'Selling price (calculated)' : 'Selling price'}
+                </Label>
                 <Input
                   id="product-selling"
                   type="number"
                   min="0"
                   step="0.01"
                   value={form.sellingPrice}
+                  disabled={isBundle}
                   onChange={(event) => patch('sellingPrice', event.target.value)}
+                  className={isBundle ? 'bg-slate-50' : undefined}
                 />
+                {isBundle ? (
+                  <p className="text-[11px] text-slate-400">
+                    Sum of selected items&apos; selling prices × quantity.
+                  </p>
+                ) : null}
               </div>
 
               <div className="space-y-1.5">
@@ -428,15 +487,6 @@ export function ItemFormDialog({
                 onChange={(taxIds) => patch('taxIds', taxIds)}
               />
             </div>
-
-            {type === PRODUCT_TYPES.BUNDLE ? (
-              <BundleItemPicker
-                catalogItems={catalogItems}
-                value={form.bundleItems}
-                excludeId={initialProduct?.id}
-                onChange={(bundleItems) => patch('bundleItems', bundleItems)}
-              />
-            ) : null}
 
             <div className="space-y-1.5">
               <Label htmlFor="product-description">Description (optional)</Label>
@@ -488,10 +538,18 @@ export function ItemFormDialog({
                 {form.purchasePrice} / {form.sellingPrice}
               </p>
               {type === PRODUCT_TYPES.BUNDLE ? (
-                <p className="mt-1">
-                  <span className="text-slate-500">Bundle lines:</span>{' '}
-                  {form.bundleItems.length}
-                </p>
+                <div className="mt-2">
+                  <p className="text-slate-500">Bundle items:</p>
+                  {bundleReviewLines.length ? (
+                    <ul className="mt-1 list-inside list-disc text-slate-800">
+                      {bundleReviewLines.map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-1 font-semibold">{form.bundleItems.length} line(s)</p>
+                  )}
+                </div>
               ) : null}
               <p className="mt-2 text-xs text-slate-400">
                 {isEdit

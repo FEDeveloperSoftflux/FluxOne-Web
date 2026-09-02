@@ -1,105 +1,179 @@
-import { Plus, Trash2 } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Search, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { NativeSelect } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
 
-// Pick existing catalog items to include in a bundle.
- 
+/**
+ * Pick existing single items for a bundle.
+ * Items may already belong to other bundles — selection is from the full single-item catalog.
+ */
 export function BundleItemPicker({
   catalogItems = [],
   value = [],
   onChange,
   excludeId = null,
+  loading = false,
   className,
 }) {
-  const options = catalogItems.filter(
-    (item) => item.id !== excludeId && item.type !== 'bundle',
+  const [query, setQuery] = useState('')
+
+  const options = useMemo(
+    () =>
+      catalogItems.filter(
+        (item) => item.id !== excludeId && item.type !== 'bundle',
+      ),
+    [catalogItems, excludeId],
   )
 
-  const usedItemIds = new Set(value.map((row) => row.itemId).filter(Boolean))
+  const selectedIds = useMemo(
+    () => new Set(value.map((row) => row.itemId).filter(Boolean)),
+    [value],
+  )
 
-  function optionsForRow(rowIndex) {
-    const currentId = value[rowIndex]?.itemId
-    return options.filter((item) => item.id === currentId || !usedItemIds.has(item.id))
+  const filteredOptions = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return options
+    return options.filter((item) => {
+      const haystack = `${item.name || ''} ${item.itemCode || ''} ${item.scale || ''}`.toLowerCase()
+      return haystack.includes(q)
+    })
+  }, [options, query])
+
+  const selectedRows = useMemo(
+    () =>
+      value
+        .map((row) => {
+          const item = options.find((opt) => opt.id === row.itemId)
+          return item ? { ...row, item } : null
+        })
+        .filter(Boolean),
+    [value, options],
+  )
+
+  function toggleItem(itemId) {
+    if (selectedIds.has(itemId)) {
+      onChange?.(value.filter((row) => row.itemId !== itemId))
+      return
+    }
+    onChange?.([...value, { itemId, quantity: 1 }])
   }
 
-  function addRow() {
-    if (!options.length) return
-    onChange?.([...value, { itemId: '', quantity: 1 }])
-  }
-
-  function patch(index, field, nextValue) {
-    const next = value.map((row, i) =>
-      i === index ? { ...row, [field]: nextValue } : row,
+  function patchQuantity(itemId, quantity) {
+    onChange?.(
+      value.map((row) =>
+        row.itemId === itemId ? { ...row, quantity: Number(quantity) || 1 } : row,
+      ),
     )
-    onChange?.(next)
   }
 
-  function remove(index) {
-    onChange?.(value.filter((_, i) => i !== index))
+  function removeItem(itemId) {
+    onChange?.(value.filter((row) => row.itemId !== itemId))
   }
 
   return (
-    <div className={className}>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <Label>Bundle items</Label>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="cursor-pointer"
-          onClick={addRow}
-          disabled={!options.length || usedItemIds.size >= options.length}
-        >
-          <Plus className="size-3.5" />
-          Add item
-        </Button>
+    <div className={cn('space-y-3', className)}>
+      <div>
+        <Label>Select existing items</Label>
+        <p className="mt-0.5 text-[11px] text-slate-500">
+          Choose single items from your catalog. Items can belong to different bundles elsewhere.
+        </p>
       </div>
 
-      {!options.length ? (
+      {loading ? (
+        <p className="text-xs text-slate-400">Loading item catalog…</p>
+      ) : !options.length ? (
         <p className="text-xs text-slate-400">
           Create at least one single item before building a bundle.
         </p>
-      ) : null}
-
-      <div className="space-y-2">
-        {value.map((row, index) => (
-          <div key={`bundle-row-${index}`} className="flex items-end gap-2">
-            <div className="min-w-0 flex-1 space-y-1">
-              <NativeSelect
-                value={row.itemId || ''}
-                onChange={(event) => patch(index, 'itemId', event.target.value)}
-              >
-                <option value="">Select item…</option>
-                {optionsForRow(index).map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name} ({item.itemCode})
-                  </option>
-                ))}
-              </NativeSelect>
-            </div>
-            <div className="w-24 space-y-1">
-              <Input
-                type="number"
-                min="0.01"
-                step="0.01"
-                value={row.quantity}
-                onChange={(event) => patch(index, 'quantity', Number(event.target.value))}
-              />
-            </div>
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              className="cursor-pointer text-red-600"
-              onClick={() => remove(index)}
-            >
-              <Trash2 className="size-4" />
-            </Button>
+      ) : (
+        <>
+          <div className="relative">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search by name or item code…"
+              className="pl-9"
+            />
           </div>
-        ))}
-      </div>
+
+          <div className="max-h-44 overflow-y-auto rounded-xl border border-border bg-slate-50/50">
+            {filteredOptions.length === 0 ? (
+              <p className="px-3 py-4 text-center text-xs text-slate-400">No items match your search.</p>
+            ) : (
+              <ul className="divide-y divide-border/70">
+                {filteredOptions.map((item) => {
+                  const checked = selectedIds.has(item.id)
+                  return (
+                    <li key={item.id}>
+                      <label className="flex cursor-pointer items-start gap-3 px-3 py-2.5 transition-colors hover:bg-white">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5"
+                          checked={checked}
+                          onChange={() => toggleItem(item.id)}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium text-slate-900">
+                            {item.name}
+                          </span>
+                          <span className="mt-0.5 block font-mono text-[11px] text-slate-400">
+                            {item.itemCode || '—'} · {item.scale || 'unit'}
+                          </span>
+                        </span>
+                      </label>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
+
+          {selectedRows.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-slate-600">
+                Selected ({selectedRows.length})
+              </p>
+              <div className="space-y-2">
+                {selectedRows.map((row) => (
+                  <div
+                    key={row.itemId}
+                    className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-slate-900">{row.item.name}</p>
+                      <p className="font-mono text-[11px] text-slate-400">{row.item.itemCode}</p>
+                    </div>
+                    <div className="w-20 shrink-0 space-y-0.5">
+                      <Label className="text-[10px] text-slate-400">Qty</Label>
+                      <Input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        value={row.quantity}
+                        onChange={(event) => patchQuantity(row.itemId, event.target.value)}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="shrink-0 cursor-pointer text-red-600"
+                      onClick={() => removeItem(row.itemId)}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-amber-700">Select at least one item for this bundle.</p>
+          )}
+        </>
+      )}
     </div>
   )
 }
