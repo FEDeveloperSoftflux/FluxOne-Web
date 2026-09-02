@@ -41,6 +41,14 @@ export async function listCategories(tenantId, { active = 'active', branchId = n
   }))
 }
 
+function mapCategoryRow(row) {
+  if (!row) return null
+  return {
+    ...row,
+    imageUrl: normalizeImageUrl(row.imageUrl),
+  }
+}
+
 export async function createCategory(tenantId, { name, parentId, imageUrl, branchId }) {
   if (!branchId) throw httpError(422, 'branchId is required to create a category')
 
@@ -70,7 +78,7 @@ export async function createCategory(tenantId, { name, parentId, imageUrl, branc
     `,
     [branchId, parentId || null, name, imageUrl || null],
   )
-  return rows[0]
+  return mapCategoryRow(rows[0])
 }
 
 export async function updateCategory(tenantId, id, { name, imageUrl, isActive, branchId = null }) {
@@ -103,7 +111,7 @@ export async function updateCategory(tenantId, id, { name, imageUrl, isActive, b
       `,
       [id, branchId],
     )
-    return rows[0] || null
+    return mapCategoryRow(rows[0] || null)
   }
 
   const { rows } = await tenantQuery(
@@ -118,7 +126,7 @@ export async function updateCategory(tenantId, id, { name, imageUrl, isActive, b
     `,
     params,
   )
-  return rows[0] || null
+  return mapCategoryRow(rows[0] || null)
 }
 
 /**
@@ -344,7 +352,10 @@ export async function listProducts(tenantId, filters = {}) {
   )
 
   const total = rows[0]?._total || 0
-  const items = rows.map(({ _total, ...item }) => item)
+  const items = rows.map(({ _total, ...item }) => ({
+    ...item,
+    imageUrl: normalizeImageUrl(item.imageUrl),
+  }))
   return { items, total, page, limit }
 }
 
@@ -457,7 +468,11 @@ export async function getProductDetail(tenantId, id, { branchId = null } = {}) {
     [id],
   )
 
-  return { ...product, bundleItems: bundleRows }
+  return {
+    ...product,
+    imageUrl: normalizeImageUrl(product.imageUrl),
+    bundleItems: bundleRows,
+  }
 }
 
 async function attachTaxes(client, tenantId, productId, taxIds = []) {
