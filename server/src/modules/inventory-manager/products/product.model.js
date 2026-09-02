@@ -583,6 +583,38 @@ async function validateProductCategories(client, tenantId, { categoryId, subcate
   }
 }
 
+async function resolveBundlePrices(client, tenantId, bundleItems = [], branchId = null) {
+  if (!bundleItems.length) return { purchasePrice: 0, sellingPrice: 0 }
+
+  const ids = bundleItems.map((item) => item.itemId)
+  const qtyById = new Map(bundleItems.map((item) => [item.itemId, Number(item.quantity) || 1]))
+
+  const { rows } = await tenantClientQuery(
+    client,
+    tenantId,
+    `
+      SELECT id, purchase_price AS "purchasePrice", selling_price AS "sellingPrice"
+      FROM products
+      WHERE tenant_id = $1 AND id = ANY($2::uuid[])
+        ${branchClause('', 3)}
+    `,
+    [ids, branchId],
+  )
+
+  let purchasePrice = 0
+  let sellingPrice = 0
+  for (const row of rows) {
+    const qty = qtyById.get(row.id) || 1
+    purchasePrice += Number(row.purchasePrice || 0) * qty
+    sellingPrice += Number(row.sellingPrice || 0) * qty
+  }
+
+  return {
+    purchasePrice: Math.round(purchasePrice * 100) / 100,
+    sellingPrice: Math.round(sellingPrice * 100) / 100,
+  }
+}
+
 export async function createProduct(tenantId, payload) {
   if (!payload.branchId) throw httpError(422, 'branchId is required to create a product')
 
@@ -598,6 +630,19 @@ export async function createProduct(tenantId, payload) {
       }
     }
 
+    let purchasePrice = payload.purchasePrice ?? 0
+    let sellingPrice = payload.sellingPrice ?? 0
+    if (payload.type === PRODUCT_TYPES.BUNDLE && payload.bundleItems?.length) {
+      const derived = await resolveBundlePrices(
+        client,
+        tenantId,
+        payload.bundleItems,
+        payload.branchId,
+      )
+      purchasePrice = derived.purchasePrice
+      sellingPrice = derived.sellingPrice
+    }
+
     const { rows } = await tenantClientQuery(
       client,
       tenantId,
@@ -611,7 +656,7 @@ export async function createProduct(tenantId, payload) {
       `,
       [
         payload.branchId,
-        payload.categoryId,
+        payload.categoryId || null,
         payload.subcategoryId || null,
         payload.type,
         payload.itemCode,
@@ -620,8 +665,8 @@ export async function createProduct(tenantId, payload) {
         payload.scale,
         payload.barcode,
         payload.description || null,
-        payload.purchasePrice ?? 0,
-        payload.sellingPrice ?? 0,
+        purchasePrice,
+        sellingPrice,
         payload.offerId || null,
         payload.discountPercent || null,
         payload.quantity ?? 0,
@@ -788,7 +833,24 @@ export async function updateProduct(tenantId, id, payload, { branchId = null } =
 
     if (payload.taxIds !== undefined) await attachTaxes(client, tenantId, id, payload.taxIds)
     if (payload.bundleItems !== undefined) {
-      await attachBundleItems(client, tenantId, id, payload.bundleItems, product.branchId || branchId)
+      const effectiveBranchId = product.branchId || branchId
+      await attachBundleItems(client, tenantId, id, payload.bundleItems, effectiveBranchId)
+      const derived = await resolveBundlePrices(
+        client,
+        tenantId,
+        payload.bundleItems,
+        effectiveBranchId,
+      )
+      await tenantClientQuery(
+        client,
+        tenantId,
+        `
+          UPDATE products
+          SET purchase_price = $3, selling_price = $4
+          WHERE tenant_id = $1 AND id = $2
+        `,
+        [id, derived.purchasePrice, derived.sellingPrice],
+      )
     }
     return product
   })
