@@ -15,11 +15,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/select'
 import { BundleItemPicker } from '@/components/feature/products/BundleItemPicker'
 import { TaxMultiSelect } from '@/components/feature/products/TaxMultiSelect'
+import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { BRAND } from '@/lib/constants'
 import { PRODUCT_TYPES, SCALE_OPTIONS } from '@/lib/mapProduct'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
-import { IMAGE_ACCEPT, imageUploadHint, validateImageFile } from '@/lib/imageUpload'
-import { toastError } from '@/lib/toast'
 
 const EMPTY = {
   name: '',
@@ -37,10 +36,10 @@ const EMPTY = {
   image: null,
 }
 
-/**
- * Create / edit single or bundle product.
- * Steps: form → confirm → success (create only: itemCode + barcode + print).
- */
+//
+// Create / edit single or bundle product.
+// Steps: form → confirm → success (create only: itemCode + barcode + print).
+//
 export function ItemFormDialog({
   open,
   onOpenChange,
@@ -63,7 +62,6 @@ export function ItemFormDialog({
   const [error, setError] = useState(null)
   const [created, setCreated] = useState(null)
   const [imageWarning, setImageWarning] = useState(null)
-  const [imageError, setImageError] = useState(null)
   const { captureBaseline, isDirty } = useFormBaseline(open)
 
   const type = isEdit ? form.type : productType
@@ -78,7 +76,6 @@ export function ItemFormDialog({
     if (!open) return
     setError(null)
     setImageWarning(null)
-    setImageError(null)
     setCreated(null)
     setStep('form')
     setConfirmed(false)
@@ -107,7 +104,7 @@ export function ItemFormDialog({
       const nextForm = {
         ...EMPTY,
         type: productType,
-        categoryId: categories[0]?.id || '',
+        categoryId: '',
       }
       setForm(nextForm)
       captureBaseline(nextForm)
@@ -116,13 +113,13 @@ export function ItemFormDialog({
   }, [open, isEdit, initialProduct, productType])
 
   // Re-seed categoryId only when create form still has none and parents load async
-  useEffect(() => {
-    if (!open || isEdit) return
-    if (form.categoryId) return
-    if (!categories[0]?.id) return
-    console.debug('[ItemFormDialog] seeding categoryId after catalog load', categories[0].id)
-    setForm((prev) => ({ ...prev, categoryId: categories[0].id }))
-  }, [open, isEdit, categories, form.categoryId])
+  // useEffect(() => {
+  //   if (!open || isEdit) return
+  //   if (form.categoryId) return
+  //   if (!categories[0]?.id) return
+  //   console.debug('[ItemFormDialog] seeding categoryId after catalog load', categories[0].id)
+  //   setForm((prev) => ({ ...prev, categoryId: categories[0].id }))
+  // }, [open, isEdit, categories, form.categoryId])
 
   function patch(field, value) {
     setForm((prev) => {
@@ -320,7 +317,7 @@ export function ItemFormDialog({
                   onChange={(event) => patch('subcategoryId', event.target.value)}
                   disabled={!subcategories.length}
                 >
-                  <option value="">None</option>
+                  <option value="">Select Sub Category</option>
                   {subcategories.map((sub) => (
                     <option key={sub.id} value={sub.id}>
                       {sub.name}
@@ -336,6 +333,7 @@ export function ItemFormDialog({
                   value={form.scale}
                   onChange={(event) => patch('scale', event.target.value)}
                 >
+                  <option value="">Select Scale</option>
                   {SCALE_OPTIONS.map((scale) => (
                     <option key={scale} value={scale}>
                       {scale}
@@ -344,30 +342,14 @@ export function ItemFormDialog({
                 </NativeSelect>
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="product-image">Image</Label>
-                <Input
-                  id="product-image"
-                  type="file"
-                  accept={IMAGE_ACCEPT}
-                  onChange={(event) => {
-                    const file = event.target.files?.[0] || null
-                    const validationError = validateImageFile(file)
-                    setImageError(validationError)
-                    if (validationError) {
-                      toastError(validationError)
-                      event.target.value = ''
-                      patch('image', null)
-                      return
-                    }
-                    patch('image', file)
-                  }}
-                />
-                <p className="text-[11px] text-slate-400">{imageUploadHint()}</p>
-                {imageError ? (
-                  <p className="text-xs text-red-600">{imageError}</p>
-                ) : null}
-              </div>
+              <ImageUploadField
+                id="product-image"
+                label="Image"
+                optionalLabel="(optional)"
+                value={form.image}
+                existingImageUrl={isEdit ? initialProduct?.imageUrl : null}
+                onChange={(file) => patch('image', file)}
+              />
 
               <div className="space-y-1.5 sm:col-span-2">
                 <Label htmlFor="product-barcode-hint">Barcode</Label>
@@ -424,7 +406,7 @@ export function ItemFormDialog({
                   value={form.offerId}
                   onChange={(event) => patch('offerId', event.target.value)}
                 >
-                  <option value="">None</option>
+                  <option value="">Select Offer</option>
                   {offers.map((offer) => (
                     <option key={offer.id} value={offer.id}>
                       {offer.name}

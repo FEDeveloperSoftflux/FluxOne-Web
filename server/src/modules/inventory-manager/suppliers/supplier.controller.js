@@ -8,15 +8,16 @@ import {
 import { resolveInventoryCreateScope, resolveInventoryScope } from '../shared.access.js'
 import { fail, success } from '../../../utils/response.util.js'
 import { paginatedResult } from '../../../utils/pagination.util.js'
+import { resolveUploadUrl } from '../../../utils/uploadUrl.util.js'
 
-function fileUrl(file) {
-  return file?.path || file?.secure_url || null
+function fileUrl(file, req) {
+  return resolveUploadUrl(file, req)
 }
 
 function filesFromRequest(req) {
   return {
-    imageUrl: fileUrl(req.files?.image?.[0] || req.file),
-    signatureUrl: fileUrl(req.files?.signature?.[0]),
+    imageUrl: fileUrl(req.files?.image?.[0] || req.file, req),
+    signatureUrl: fileUrl(req.files?.signature?.[0], req),
   }
 }
 

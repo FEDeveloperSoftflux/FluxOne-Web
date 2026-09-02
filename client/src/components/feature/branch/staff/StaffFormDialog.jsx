@@ -12,11 +12,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
+import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { BRAND } from '@/lib/constants'
 import { validateStaffForm } from '@/lib/validation/staffSchedule'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
-import { IMAGE_ACCEPT, imageUploadHint, validateImageFile } from '@/lib/imageUpload'
-import { toastError } from '@/lib/toast'
 import { apiClient } from '@/api/api'
 import { endpoints } from '@/api/endpoints'
 
@@ -55,14 +54,12 @@ export function StaffFormDialog({
   const isEdit = mode === 'edit'
   const [form, setForm] = useState(EMPTY_FORM)
   const [error, setError] = useState(null)
-  const [imageError, setImageError] = useState(null)
   const [designations, setDesignations] = useState([])
   const { captureBaseline, isDirty } = useFormBaseline(open)
 
   useEffect(() => {
     if (!open) return
     setError(null)
-    setImageError(null)
 
     // Fetch designations
     async function loadDesignations() {
@@ -261,28 +258,14 @@ export function StaffFormDialog({
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="staff-image">Photo (optional)</Label>
-              <Input
-                id="staff-image"
-                type="file"
-                accept={IMAGE_ACCEPT}
-                onChange={(e) => {
-                  const file = e.target.files?.[0] || null
-                  const validationError = validateImageFile(file)
-                  setImageError(validationError)
-                  if (validationError) {
-                    toastError(validationError)
-                    e.target.value = ''
-                    patch('image', null)
-                    return
-                  }
-                  patch('image', file)
-                }}
-              />
-              <p className="text-[11px] text-slate-400">{imageUploadHint()}</p>
-              {imageError ? <p className="text-xs text-red-600">{imageError}</p> : null}
-            </div>
+            <ImageUploadField
+              id="staff-image"
+              label="Photo"
+              optionalLabel="(optional)"
+              value={form.image}
+              existingImageUrl={isEdit ? initialStaff?.imageUrl : null}
+              onChange={(file) => patch('image', file)}
+            />
           </div>
 
           {error ? (

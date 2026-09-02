@@ -4,9 +4,8 @@ import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 
-/**
- * Pick existing catalog items to include in a bundle.
- */
+// Pick existing catalog items to include in a bundle.
+ 
 export function BundleItemPicker({
   catalogItems = [],
   value = [],

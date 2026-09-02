@@ -1,5 +1,6 @@
 import { tenantClientQuery, tenantQuery, withTransaction } from '../../../config/db.js'
 import { PRODUCT_TYPES } from '../../../config/constants.js'
+import { normalizeImageUrl } from '../../../utils/uploadUrl.util.js'
 
 function httpError(status, message) {
   const error = new Error(message)
@@ -34,7 +35,10 @@ export async function listCategories(tenantId, { active = 'active', branchId = n
     `,
     [branchId],
   )
-  return rows
+  return rows.map((row) => ({
+    ...row,
+    imageUrl: normalizeImageUrl(row.imageUrl),
+  }))
 }
 
 export async function createCategory(tenantId, { name, parentId, imageUrl, branchId }) {

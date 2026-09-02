@@ -7,41 +7,32 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { UserAvatar } from '@/components/shared/UserAvatar'
 import { useAuthSession } from '@/hooks/useAuthSession'
-import { BRAND } from '@/lib/constants'
-import { getInitials, roleDisplayName } from '@/lib/nav'
+import { roleDisplayName } from '@/lib/nav'
 import { cn } from '@/lib/utils'
 import { PATHS, profilePathForRole } from '@/router/paths'
-
-function UserAvatar({ initials, className }) {
-  return (
-    <div
-      className={cn(
-        'flex size-10 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white',
-        className,
-      )}
-      style={{ background: BRAND.purple }}
-    >
-      {initials}
-    </div>
-  )
-}
 
 export function UserMenu({ className }) {
   const navigate = useNavigate()
   const { user, role, logout } = useAuthSession()
   const name = user?.name || 'User'
-  const initials = getInitials(name, user?.email)
   const roleLabel = roleDisplayName(role)
   const userId = user?.email || user?.id || '—'
   const profilePath = profilePathForRole(role)
+  const imageUrl = user?.imageUrl || null
 
   return (
     <div className={cn('relative', className)}>
       <DropdownMenu>
         <DropdownMenuTrigger className="cursor-pointer rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[#8E238F]/40">
           <div className="flex items-center gap-2.5 py-1">
-            <UserAvatar initials={initials} />
+            <UserAvatar
+              name={name}
+              loginId={user?.email}
+              imageUrl={imageUrl}
+              className="size-10"
+            />
             <div className="hidden min-w-0 text-left sm:block">
               <p className="truncate text-sm leading-tight font-semibold text-slate-900">{name}</p>
               <p className="truncate text-xs leading-tight text-slate-500">{roleLabel}</p>
@@ -55,13 +46,17 @@ export function UserMenu({ className }) {
           className="mt-2 w-64 rounded-2xl border border-border bg-white p-0 shadow-[0_12px_40px_rgba(15,23,42,0.12)]"
         >
           <div className="flex items-center gap-3 px-4 py-3">
-            <UserAvatar initials={initials} className="size-11 text-sm" />
+            <UserAvatar
+              name={name}
+              loginId={user?.email}
+              imageUrl={imageUrl}
+              className="size-11"
+              fallbackClassName="text-sm"
+            />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-slate-800">{name}</p>
               <p className="truncate text-xs text-slate-500">{roleLabel}</p>
-              <p className="mt-0.5 truncate text-xs font-medium" style={{ color: BRAND.deep }}>
-                {userId}
-              </p>
+              <p className="mt-0.5 truncate text-xs font-medium text-[#412283]">{userId}</p>
             </div>
           </div>
 

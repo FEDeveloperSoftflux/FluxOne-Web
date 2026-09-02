@@ -20,10 +20,7 @@ import { PRODUCT_TYPES } from '../../../config/constants.js'
 import { generateBarcodeValue, generateItemCode, renderBarcodePng } from '../../../utils/barcode.util.js'
 import { fail, success } from '../../../utils/response.util.js'
 import { paginatedResult } from '../../../utils/pagination.util.js'
-
-function uploadedUrl(file) {
-  return file?.path || file?.secure_url || null
-}
+import { resolveUploadUrl } from '../../../utils/uploadUrl.util.js'
 
 function scopeError(res, err) {
   if (err?.status) return fail(res, err.message, err.status)
@@ -53,7 +50,7 @@ export async function addCategory(req, res) {
     const { tenantId, branchId } = resolveInventoryCreateScope(req)
     const row = await createCategory(tenantId, {
       ...req.validated.body,
-      imageUrl: uploadedUrl(req.file),
+      imageUrl: resolveUploadUrl(req.file, req),
       branchId,
     })
     return success(res, row, 201)
@@ -67,7 +64,7 @@ export async function patchCategory(req, res) {
     const { tenantId, branchId } = resolveInventoryScope(req)
     const row = await updateCategory(tenantId, req.validated.params.id, {
       ...req.validated.body,
-      ...(req.file ? { imageUrl: uploadedUrl(req.file) } : {}),
+      ...(req.file ? { imageUrl: resolveUploadUrl(req.file, req) } : {}),
       branchId,
     })
     if (!row) return fail(res, 'Category not found', 404)
@@ -109,7 +106,7 @@ export async function addProduct(req, res) {
     const row = await createProduct(tenantId, {
       ...body,
       branchId,
-      imageUrl: uploadedUrl(req.file),
+      imageUrl: resolveUploadUrl(req.file, req),
       itemCode: generateItemCode(),
       barcode: generateBarcodeValue(),
     })
@@ -220,7 +217,7 @@ export async function update(req, res) {
       req.validated.params.id,
       {
         ...req.validated.body,
-        ...(req.file ? { imageUrl: uploadedUrl(req.file) } : {}),
+        ...(req.file ? { imageUrl: resolveUploadUrl(req.file, req) } : {}),
       },
       { branchId },
     )

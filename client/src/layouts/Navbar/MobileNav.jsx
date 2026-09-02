@@ -3,9 +3,10 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { LogOut, Menu, UserRound, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { BrandLogo } from '@/components/shared/BrandLogo'
+import { UserAvatar } from '@/components/shared/UserAvatar'
 import { useAuthSession } from '@/hooks/useAuthSession'
 import { BRAND } from '@/lib/constants'
-import { getInitials, roleDisplayName } from '@/lib/nav'
+import { roleDisplayName } from '@/lib/nav'
 import { cn } from '@/lib/utils'
 import { PATHS, profilePathForRole } from '@/router/paths'
 
@@ -60,11 +61,10 @@ function MobileDrawer({ open, onClose, items }) {
   const navigate = useNavigate()
   const { user, role, logout } = useAuthSession()
   const name = user?.name || 'User'
-  const initials = getInitials(name, user?.email)
   const roleLabel = roleDisplayName(role)
   const userId = user?.email || user?.id || '—'
   const profilePath = profilePathForRole(role)
-
+  const imageUrl = user?.imageUrl || null
   useEffect(() => {
     if (!open) return undefined
     const onKeyDown = (event) => {
@@ -110,12 +110,13 @@ function MobileDrawer({ open, onClose, items }) {
             </div>
 
             <div className="flex items-center gap-3 border-b border-border px-4 py-4">
-              <div
-                className="flex size-11 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
-                style={{ background: `linear-gradient(145deg, ${BRAND.purple}, ${BRAND.deep})` }}
-              >
-                {initials}
-              </div>
+              <UserAvatar
+                name={name}
+                loginId={user?.email}
+                imageUrl={imageUrl}
+                className="size-11"
+                fallbackClassName="text-sm"
+              />
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-slate-800">{name}</p>
                 <p className="truncate text-xs text-slate-500">{roleLabel}</p>
