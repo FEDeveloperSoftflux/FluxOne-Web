@@ -70,6 +70,7 @@ export function formatMovementDateTime(value) {
 }
 
 export function shortId(id) {
+  // Deprecated: prefer displayMovementRef / formatDisplayId helpers.
   if (!id) return '—'
   const s = String(id)
   return s.length > 8 ? `${s.slice(0, 8)}…` : s

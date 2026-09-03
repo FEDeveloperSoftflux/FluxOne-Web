@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Check, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -21,12 +21,11 @@ import {
 import { cn } from '@/lib/utils'
 
 const STEPS = [
-  { id: 1, label: '1. Select Item' },
-  { id: 2, label: '2. Set Qty' },
+  { id: 1, label: '1. Add items' },
+  { id: 2, label: '2. Review' },
   { id: 3, label: '3. Confirm' },
 ]
 
-// Helper function to get tomorrow's date in YYYY-MM-DD format
 function getTomorrowDateString() {
   const tomorrow = new Date()
   tomorrow.setDate(tomorrow.getDate() + 1)
@@ -36,44 +35,32 @@ function getTomorrowDateString() {
   return `${year}-${month}-${day}`
 }
 
-// Helper function to validate expiry date - must be in future (not today, not past)
 function validateExpiryDate(expiryDateString) {
-  if (!expiryDateString) return true // Optional field
+  if (!expiryDateString) return true
 
-  let expiryDate
-
-  // Handle different date formats
-  if (expiryDateString.includes('/')) {
-    // DD/MM/YYYY format
-    const parts = expiryDateString.split('/')
-    if (parts.length === 3) {
-      const day = parseInt(parts[0], 10)
-      const month = parseInt(parts[1], 10)
-      const year = parseInt(parts[2], 10)
-      expiryDate = new Date(year, month - 1, day)
-    }
-  } else if (expiryDateString.includes('-')) {
-    // YYYY-MM-DD format
-    expiryDate = new Date(expiryDateString)
-  } else {
-    expiryDate = new Date(expiryDateString)
-  }
-
-  if (isNaN(expiryDate.getTime())) {
-    return false
-  }
+  const expiryDate = new Date(expiryDateString)
+  if (Number.isNaN(expiryDate.getTime())) return false
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   expiryDate.setHours(0, 0, 0, 0)
-
-  // Date must be AFTER today (tomorrow or later) - not today, not past
   return expiryDate > today
 }
 
+function emptyDraft() {
+  return {
+    categoryId: '',
+    subcategoryId: '',
+    productId: '',
+    scale: 'unit',
+    quantity: '1',
+    unitCost: '',
+    expiresAt: '',
+  }
+}
+
 /**
- * 3-step Add Stock wizard (Select Item → Set Qty → Confirm).
- * All selections use dropdowns; product starts unselected.
+ * Multi-item stock-in: one supplier, many product lines → single POST /stock-in.
  */
 export function AddStockInDialog({
   open,
@@ -86,28 +73,23 @@ export function AddStockInDialog({
   const childrenByParent = catalog?.childrenByParent
 
   const [step, setStep] = useState(1)
-  const [categoryId, setCategoryId] = useState('')
-  const [subcategoryId, setSubcategoryId] = useState('')
-  const [productId, setProductId] = useState('')
+  const [draft, setDraft] = useState(emptyDraft())
+  const [lines, setLines] = useState([])
   const [products, setProducts] = useState([])
   const [suppliers, setSuppliers] = useState([])
   const [supplierId, setSupplierId] = useState('')
-  const [scale, setScale] = useState('unit')
-  const [quantity, setQuantity] = useState('1')
-  const [unitCost, setUnitCost] = useState('')
-  const [expiresAt, setExpiresAt] = useState('')
   const [error, setError] = useState(null)
-  const [expiryError, setExpiryError] = useState('') // New state for expiry error
+  const [expiryError, setExpiryError] = useState('')
   const [loadingOptions, setLoadingOptions] = useState(false)
 
   const subs = useMemo(() => {
-    if (!categoryId || !childrenByParent?.get) return []
-    return childrenByParent.get(categoryId) || []
-  }, [categoryId, childrenByParent])
+    if (!draft.categoryId || !childrenByParent?.get) return []
+    return childrenByParent.get(draft.categoryId) || []
+  }, [draft.categoryId, childrenByParent])
 
   const selectedProduct = useMemo(
-    () => products.find((p) => p.id === productId) || null,
-    [products, productId],
+    () => products.find((p) => p.id === draft.productId) || null,
+    [products, draft.productId],
   )
 
   const selectedSupplier = useMemo(
@@ -120,15 +102,10 @@ export function AddStockInDialog({
     setStep(1)
     setError(null)
     setExpiryError('')
-    setCategoryId('')
-    setSubcategoryId('')
-    setProductId('')
-    setProducts([])
+    setDraft(emptyDraft())
+    setLines([])
     setSupplierId('')
-    setScale('unit')
-    setQuantity('1')
-    setUnitCost('')
-    setExpiresAt('')
+    setProducts([])
     setLoadingOptions(true)
     void (async () => {
       const supRes = await fetchControlSuppliers()
@@ -141,42 +118,102 @@ export function AddStockInDialog({
     if (!open) return
     let cancelled = false
     void fetchControlProductOptions({
-      categoryId: categoryId || undefined,
-      subcategoryId: subcategoryId || undefined,
+      categoryId: draft.categoryId || undefined,
+      subcategoryId: draft.subcategoryId || undefined,
       limit: 50,
     }).then((res) => {
       if (cancelled || !res.success) return
       setProducts(res.items)
-      setProductId((prev) => (res.items.some((p) => p.id === prev) ? prev : ''))
+      setDraft((prev) =>
+        res.items.some((p) => p.id === prev.productId)
+          ? prev
+          : { ...prev, productId: '' },
+      )
     })
     return () => {
       cancelled = true
     }
-  }, [open, categoryId, subcategoryId])
+  }, [open, draft.categoryId, draft.subcategoryId])
+
+  function patchDraft(field, value) {
+    setDraft((prev) => {
+      const next = { ...prev, [field]: value }
+      if (field === 'categoryId') {
+        next.subcategoryId = ''
+        next.productId = ''
+      }
+      if (field === 'subcategoryId') next.productId = ''
+      return next
+    })
+  }
+
+  function resetDraftAfterAdd() {
+    setDraft((prev) => ({
+      ...emptyDraft(),
+      categoryId: prev.categoryId,
+      subcategoryId: prev.subcategoryId,
+    }))
+    setExpiryError('')
+  }
+
+  function addLineToCart() {
+    setError(null)
+    setExpiryError('')
+
+    if (!draft.productId) {
+      setError('Select a product to add')
+      return
+    }
+    if (!draft.scale || !(Number(draft.quantity) > 0)) {
+      setError('Enter a valid scale and positive quantity')
+      return
+    }
+    if (draft.expiresAt && !validateExpiryDate(draft.expiresAt)) {
+      setExpiryError('Expiry must be a future date')
+      return
+    }
+    if (lines.some((row) => row.productId === draft.productId)) {
+      setError('This product is already in the list — remove it first or pick another item')
+      return
+    }
+
+    const product = selectedProduct || products.find((p) => p.id === draft.productId)
+    setLines((prev) => [
+      ...prev,
+      {
+        productId: draft.productId,
+        productName: product?.name || 'Item',
+        itemCode: product?.itemCode || '',
+        scale: draft.scale,
+        quantity: Number(draft.quantity),
+        unitCost:
+          draft.unitCost === '' || draft.unitCost == null
+            ? undefined
+            : Number(draft.unitCost),
+        expiresAt: draft.expiresAt || undefined,
+      },
+    ])
+    resetDraftAfterAdd()
+  }
+
+  function removeLine(productId) {
+    setLines((prev) => prev.filter((row) => row.productId !== productId))
+  }
 
   function goNext() {
     setError(null)
     setExpiryError('')
-    
+
     if (step === 1) {
-      if (!productId) {
-        setError('Select a product')
+      if (!lines.length) {
+        setError('Add at least one item before continuing')
         return
-      }
-      if (selectedProduct?.scale) setScale(selectedProduct.scale)
-      if (selectedProduct?.purchasePrice != null && unitCost === '') {
-        setUnitCost(String(selectedProduct.purchasePrice))
       }
       setStep(2)
       return
     }
-    
+
     if (step === 2) {
-      if (!scale || !(Number(quantity) > 0)) {
-        setError('Enter a valid scale and positive quantity')
-        return
-      }
-      
       setStep(3)
     }
   }
@@ -190,31 +227,30 @@ export function AddStockInDialog({
   async function handleSave() {
     setError(null)
     setExpiryError('')
-    
-    if (!productId || !(Number(quantity) > 0) || !scale) {
-      setError('Missing product, scale, or quantity')
+
+    if (!lines.length) {
+      setError('Add at least one item')
       return
     }
-    
-    // Final validation for expiry date
-    if (expiresAt && !validateExpiryDate(expiresAt)) {
-      setExpiryError('Expired product cannot be added in stock')
-      return
+
+    for (const row of lines) {
+      if (row.expiresAt && !validateExpiryDate(row.expiresAt)) {
+        setExpiryError(`Invalid expiry date for ${row.productName}`)
+        return
+      }
     }
-    
+
     const payload = {
       supplierId: supplierId || undefined,
-      lines: [
-        {
-          productId,
-          scale,
-          quantity: Number(quantity),
-          unitCost:
-            unitCost === '' || unitCost == null ? undefined : Number(unitCost),
-          expiresAt: expiresAt || undefined,
-        },
-      ],
+      lines: lines.map((row) => ({
+        productId: row.productId,
+        scale: row.scale,
+        quantity: row.quantity,
+        unitCost: row.unitCost,
+        expiresAt: row.expiresAt,
+      })),
     }
+
     const result = await onSubmit?.(payload)
     if (result?.success) onOpenChange?.(false)
     else if (result?.error) setError(result.error)
@@ -222,15 +258,15 @@ export function AddStockInDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent 
-        className="max-w-md"
+      <DialogContent
+        className="max-w-lg"
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
         <DialogHeader>
           <DialogTitle>Add New Stock</DialogTitle>
-          <DialogDescription className="sr-only">
-            Multi-step stock-in: select item, set quantity, confirm.
+          <DialogDescription>
+            Add one or more items from the same supplier in a single stock-in.
           </DialogDescription>
         </DialogHeader>
 
@@ -266,98 +302,6 @@ export function AddStockInDialog({
         {step === 1 ? (
           <div className="space-y-4 pt-2">
             <div className="space-y-1.5">
-              <Label>Category</Label>
-              <NativeSelect
-                value={categoryId}
-                onChange={(e) => {
-                  setCategoryId(e.target.value)
-                  setSubcategoryId('')
-                  setProductId('')
-                }}
-              >
-                <option value="">All Categories</option>
-                {parents.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </NativeSelect>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Sub category</Label>
-              <NativeSelect
-                value={subcategoryId}
-                disabled={!categoryId}
-                onChange={(e) => {
-                  setSubcategoryId(e.target.value)
-                  setProductId('')
-                }}
-              >
-                <option value="">All</option>
-                {subs.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </NativeSelect>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Item</Label>
-              <NativeSelect
-                value={productId}
-                onChange={(e) => {
-                  const id = e.target.value
-                  setProductId(id)
-                  const p = products.find((x) => x.id === id)
-                  if (p) setScale(p.scale || 'unit')
-                }}
-              >
-                <option value="">Select product</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                    {p.scale ? ` (${p.scale})` : ''}
-                  </option>
-                ))}
-              </NativeSelect>
-              {!products.length && !loadingOptions ? (
-                <p className="text-xs text-amber-700">No products match these filters.</p>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
-
-        {step === 2 ? (
-          <div className="space-y-4 pt-2">
-            <div className="space-y-1.5">
-              <Label>Scale</Label>
-              <NativeSelect value={scale} onChange={(e) => setScale(e.target.value)}>
-                {SCALE_OPTIONS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </NativeSelect>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Quantity to Add</Label>
-              <Input
-                type="number"
-                inputMode="numeric"
-                min="1"
-                step="1"
-                value={quantity}
-                placeholder="Enter quantity"
-                onChange={(e) => {
-                  const val = e.target.value
-                  // Allow manual input of any number >= 1
-                  if (val === '' || Number(val) >= 1) {
-                    setQuantity(val)
-                  }
-                }}
-              />
-            </div>
-            <div className="space-y-1.5">
               <Label>Company / Supplier</Label>
               <NativeSelect value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
                 <option value="">Select supplier (optional)</option>
@@ -367,74 +311,235 @@ export function AddStockInDialog({
                   </option>
                 ))}
               </NativeSelect>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Expiry date (optional)</Label>
-              <Input
-                type="date"
-                value={expiresAt}
-                min={getTomorrowDateString()}
-                onChange={(e) => {
-                  setExpiresAt(e.target.value)
-                  // Clear error when user updates date
-                  if (expiryError) setExpiryError('')
-                }}
-              />
-              <p className="text-xs text-slate-500">
-                When set, stock past this date is moved to Expired automatically.
+              <p className="text-[11px] text-slate-500">
+                All items in this stock-in use the same vendor.
               </p>
             </div>
-            <div className="space-y-1.5">
-              <Label>Unit cost (optional)</Label>
-              <Input
-                type="number"
-                min="0"
-                step="any"
-                value={unitCost}
-                onChange={(e) => setUnitCost(e.target.value)}
-              />
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Category</Label>
+                <NativeSelect
+                  value={draft.categoryId}
+                  onChange={(e) => patchDraft('categoryId', e.target.value)}
+                >
+                  <option value="">All categories</option>
+                  {parents.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Sub category</Label>
+                <NativeSelect
+                  value={draft.subcategoryId}
+                  disabled={!draft.categoryId}
+                  onChange={(e) => patchDraft('subcategoryId', e.target.value)}
+                >
+                  <option value="">All</option>
+                  {subs.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </div>
             </div>
+
+            <div className="space-y-1.5">
+              <Label>Item</Label>
+              <NativeSelect
+                value={draft.productId}
+                onChange={(e) => {
+                  const id = e.target.value
+                  const p = products.find((x) => x.id === id)
+                  setDraft((prev) => ({
+                    ...prev,
+                    productId: id,
+                    scale: p?.scale || prev.scale || 'unit',
+                    unitCost:
+                      p?.purchasePrice != null && prev.unitCost === ''
+                        ? String(p.purchasePrice)
+                        : prev.unitCost,
+                  }))
+                }}
+              >
+                <option value="">Select product</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id} disabled={lines.some((l) => l.productId === p.id)}>
+                    {p.name}
+                    {p.scale ? ` (${p.scale})` : ''}
+                    {lines.some((l) => l.productId === p.id) ? ' — added' : ''}
+                  </option>
+                ))}
+              </NativeSelect>
+              {!products.length && !loadingOptions ? (
+                <p className="text-xs text-amber-700">No products match these filters.</p>
+              ) : null}
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Scale</Label>
+                <NativeSelect
+                  value={draft.scale}
+                  onChange={(e) => patchDraft('scale', e.target.value)}
+                >
+                  {SCALE_OPTIONS.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Quantity</Label>
+                <Input
+                  type="number"
+                  min="0.001"
+                  step="any"
+                  value={draft.quantity}
+                  onChange={(e) => patchDraft('quantity', e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Unit cost (optional)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={draft.unitCost}
+                  onChange={(e) => patchDraft('unitCost', e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Expiry (optional)</Label>
+                <Input
+                  type="date"
+                  value={draft.expiresAt}
+                  min={getTomorrowDateString()}
+                  onChange={(e) => {
+                    patchDraft('expiresAt', e.target.value)
+                    if (expiryError) setExpiryError('')
+                  }}
+                />
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full cursor-pointer"
+              style={{ color: BRAND.purple, borderColor: BRAND.purple }}
+              onClick={addLineToCart}
+            >
+              <Plus className="size-4" />
+              Add item to list
+            </Button>
+
+            {lines.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-600">
+                  Items to stock in ({lines.length})
+                </p>
+                <ul className="max-h-40 space-y-2 overflow-y-auto">
+                  {lines.map((row) => (
+                    <li
+                      key={row.productId}
+                      className="flex items-center gap-2 rounded-lg border border-border bg-slate-50/80 px-3 py-2 text-sm"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium text-slate-900">{row.productName}</p>
+                        <p className="text-xs text-slate-500">
+                          {row.quantity} {row.scale}
+                          {row.itemCode ? ` · ${row.itemCode}` : ''}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="shrink-0 cursor-pointer text-red-600"
+                        onClick={() => removeLine(row.productId)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400">No items added yet.</p>
+            )}
+          </div>
+        ) : null}
+
+        {step === 2 ? (
+          <div className="space-y-3 pt-2">
+            {selectedSupplier ? (
+              <p className="text-sm text-slate-600">
+                <span className="font-medium text-slate-800">Supplier:</span>{' '}
+                {selectedSupplier.companyName || selectedSupplier.name}
+              </p>
+            ) : (
+              <p className="text-sm text-slate-500">No supplier selected.</p>
+            )}
+            <ul className="max-h-56 space-y-2 overflow-y-auto">
+              {lines.map((row) => (
+                <li
+                  key={row.productId}
+                  className="rounded-lg border border-border px-3 py-2 text-sm"
+                >
+                  <p className="font-medium text-slate-900">{row.productName}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {row.quantity} {row.scale}
+                    {row.unitCost != null ? ` · cost ${row.unitCost}` : ''}
+                    {row.expiresAt ? ` · expires ${row.expiresAt}` : ''}
+                  </p>
+                </li>
+              ))}
+            </ul>
           </div>
         ) : null}
 
         {step === 3 ? (
-          <div className="pt-2">
+          <div className="space-y-3 pt-2">
             <div
               className="rounded-xl px-4 py-4 text-sm leading-relaxed text-slate-700"
               style={{ background: BRAND.soft }}
             >
-              Adding{' '}
-              <span className="font-bold" style={{ color: BRAND.purple }}>
-                {quantity} {scale}
-              </span>{' '}
-              of{' '}
-              <span className="font-bold" style={{ color: BRAND.purple }}>
-                {selectedProduct?.name || 'item'}
-              </span>
-              {selectedSupplier ? (
-                <>
-                  {' '}
-                  from{' '}
-                  <span className="font-bold" style={{ color: BRAND.purple }}>
-                    {selectedSupplier.companyName || selectedSupplier.name}
-                  </span>
-                </>
-              ) : null}
-              {expiresAt ? (
-                <>
-                  {' '}
-                  (expires{' '}
-                  <span className="font-bold" style={{ color: BRAND.purple }}>
-                    {expiresAt}
-                  </span>
-                  )
-                </>
-              ) : null}
-              . Confirm?
+              <p>
+                Stock in{' '}
+                <span className="font-bold" style={{ color: BRAND.purple }}>
+                  {lines.length} item{lines.length === 1 ? '' : 's'}
+                </span>
+                {selectedSupplier ? (
+                  <>
+                    {' '}
+                    from{' '}
+                    <span className="font-bold" style={{ color: BRAND.purple }}>
+                      {selectedSupplier.companyName || selectedSupplier.name}
+                    </span>
+                  </>
+                ) : null}
+                ?
+              </p>
+              <ul className="mt-2 list-inside list-disc text-slate-800">
+                {lines.map((row) => (
+                  <li key={row.productId}>
+                    {row.productName} — {row.quantity} {row.scale}
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         ) : null}
 
+        {expiryError ? (
+          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{expiryError}</p>
+        ) : null}
         {error ? (
           <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
         ) : null}
@@ -468,7 +573,7 @@ export function AddStockInDialog({
               type="button"
               className="cursor-pointer text-white transition-none"
               style={{ background: `linear-gradient(135deg, ${BRAND.purple}, ${BRAND.deep})` }}
-              disabled={loading || loadingOptions}
+              disabled={loading || loadingOptions || (step === 1 && !lines.length)}
               onClick={goNext}
             >
               Next
@@ -483,7 +588,7 @@ export function AddStockInDialog({
               onClick={handleSave}
             >
               <Check className="size-4" />
-              {loading ? 'Saving…' : 'Save'}
+              {loading ? 'Saving…' : `Save ${lines.length} item${lines.length === 1 ? '' : 's'}`}
             </Button>
           )}
         </DialogFooter>

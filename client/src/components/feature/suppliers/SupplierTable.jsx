@@ -5,6 +5,7 @@ import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { BRAND } from '@/lib/constants'
+import { displaySupplierRef } from '@/lib/formatDisplayId'
 import { ProductStatusToggle } from '@/components/feature/products/ProductStatusToggle'
 
 /**
@@ -51,7 +52,7 @@ export function SupplierTable({
             <thead>
               <tr className="border-b border-border text-xs uppercase tracking-wide text-slate-400">
                 <th className="px-2 py-3 font-semibold">Image</th>
-                <th className="px-2 py-3 font-semibold">ID</th>
+                <th className="px-2 py-3 font-semibold">Reference</th>
                 <th className="px-2 py-3 font-semibold">Company</th>
                 <th className="px-2 py-3 font-semibold">Company phone</th>
                 <th className="px-2 py-3 font-semibold">Representative</th>
@@ -84,8 +85,8 @@ export function SupplierTable({
                       </div>
                     )}
                   </td>
-                  <td className="px-2 py-3 font-mono text-[11px] text-slate-500">
-                    {row.id?.slice(0, 8)}…
+                  <td className="px-2 py-3 font-mono text-xs text-slate-600" title={row.id}>
+                    {displaySupplierRef(row)}
                   </td>
                   <td className="px-2 py-3 font-medium text-slate-800">{row.companyName}</td>
                   <td className="px-2 py-3 text-slate-600">{row.companyPhone || '—'}</td>

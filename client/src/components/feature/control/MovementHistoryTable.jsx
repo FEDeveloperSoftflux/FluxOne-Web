@@ -5,7 +5,8 @@ import { Pagination } from '@/components/shared/Pagination'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
-import { formatMovementDateTime, shortId } from '@/lib/mapStockMovement'
+import { formatMovementDateTime } from '@/lib/mapStockMovement'
+import { displayMovementRef } from '@/lib/formatDisplayId'
 import { cn } from '@/lib/utils'
 
 /**
@@ -122,12 +123,12 @@ export function MovementHistoryTable({
 export function movementImageNameColumns() {
   return [
     {
-      key: 'id',
-      label: 'Id',
-      className: 'w-24',
+      key: 'reference',
+      label: 'Reference',
+      className: 'w-28',
       render: (row) => (
         <span className="font-mono text-xs text-slate-600" title={row.id}>
-          {shortId(row.id)}
+          {displayMovementRef(row)}
         </span>
       ),
     },
