@@ -9,12 +9,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { UserAvatar } from '@/components/shared/UserAvatar'
 import { useAuthSession } from '@/hooks/useAuthSession'
-<<<<<<< HEAD
-import { BRAND, ROLES } from '@/lib/constants'
-import { getInitials, roleDisplayName } from '@/lib/nav'
-=======
+import { ROLES } from '@/lib/constants'
 import { roleDisplayName } from '@/lib/nav'
->>>>>>> 42db3520f8e961d51f6cd38c986c34fa0576799d
 import { cn } from '@/lib/utils'
 import { PATHS, profilePathForRole } from '@/router/paths'
 
