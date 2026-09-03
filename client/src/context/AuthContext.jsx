@@ -1,12 +1,17 @@
-import { createContext, useContext, useMemo } from 'react'
+import { createContext, useContext, useEffect, useMemo } from 'react'
 import { useAppDispatch, useAppSelector } from '@/rtk/hooks'
-import { loginUser, logoutUser } from '@/rtk/features/auth/authSlice'
+import { fetchCurrentUser, loginUser, logoutUser } from '@/rtk/features/auth/authSlice'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const dispatch = useAppDispatch()
   const auth = useAppSelector((state) => state.auth)
+
+  useEffect(() => {
+    if (!auth.token || !auth.isAuthenticated) return
+    void dispatch(fetchCurrentUser())
+  }, [dispatch, auth.token, auth.isAuthenticated])
 
   const value = useMemo(
     () => ({

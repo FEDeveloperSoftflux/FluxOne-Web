@@ -15,11 +15,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/select'
 import { BundleItemPicker } from '@/components/feature/products/BundleItemPicker'
 import { TaxMultiSelect } from '@/components/feature/products/TaxMultiSelect'
+import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { BRAND } from '@/lib/constants'
 import { PRODUCT_TYPES, SCALE_OPTIONS } from '@/lib/mapProduct'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
-import { IMAGE_ACCEPT, imageUploadHint, validateImageFile } from '@/lib/imageUpload'
-import { toastError } from '@/lib/toast'
 
 const EMPTY = {
   name: '',
@@ -37,10 +36,10 @@ const EMPTY = {
   image: null,
 }
 
-/**
- * Create / edit single or bundle product.
- * Steps: form → confirm → success (create only: itemCode + barcode + print).
- */
+//
+// Create / edit single or bundle product.
+// Steps: form → confirm → success (create only: itemCode + barcode + print).
+//
 export function ItemFormDialog({
   open,
   onOpenChange,
@@ -52,6 +51,7 @@ export function ItemFormDialog({
   taxes = [],
   offers = [],
   catalogItems = [],
+  catalogItemsLoading = false,
   loading = false,
   onSubmit,
   onPrintBarcode,
@@ -63,10 +63,10 @@ export function ItemFormDialog({
   const [error, setError] = useState(null)
   const [created, setCreated] = useState(null)
   const [imageWarning, setImageWarning] = useState(null)
-  const [imageError, setImageError] = useState(null)
   const { captureBaseline, isDirty } = useFormBaseline(open)
 
   const type = isEdit ? form.type : productType
+  const isBundle = type === PRODUCT_TYPES.BUNDLE
 
   const subcategories = useMemo(() => {
     if (!form.categoryId || !childrenByParent) return []
@@ -78,7 +78,6 @@ export function ItemFormDialog({
     if (!open) return
     setError(null)
     setImageWarning(null)
-    setImageError(null)
     setCreated(null)
     setStep('form')
     setConfirmed(false)
@@ -107,7 +106,7 @@ export function ItemFormDialog({
       const nextForm = {
         ...EMPTY,
         type: productType,
-        categoryId: categories[0]?.id || '',
+        categoryId: '',
       }
       setForm(nextForm)
       captureBaseline(nextForm)
@@ -115,14 +114,34 @@ export function ItemFormDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- categories seeded in separate effect
   }, [open, isEdit, initialProduct, productType])
 
-  // Re-seed categoryId only when create form still has none and parents load async
+  // Bundle purchase/selling prices = sum of selected single-item prices × qty
   useEffect(() => {
-    if (!open || isEdit) return
-    if (form.categoryId) return
-    if (!categories[0]?.id) return
-    console.debug('[ItemFormDialog] seeding categoryId after catalog load', categories[0].id)
-    setForm((prev) => ({ ...prev, categoryId: categories[0].id }))
-  }, [open, isEdit, categories, form.categoryId])
+    if (!open || !isBundle) return
+    let purchase = 0
+    let selling = 0
+    for (const row of form.bundleItems) {
+      const item = catalogItems.find((entry) => entry.id === row.itemId)
+      if (!item) continue
+      const qty = Number(row.quantity) || 1
+      purchase += Number(item.purchasePrice || 0) * qty
+      selling += Number(item.sellingPrice || 0) * qty
+    }
+    const nextPurchase = purchase > 0 ? String(Math.round(purchase * 100) / 100) : ''
+    const nextSelling = selling > 0 ? String(Math.round(selling * 100) / 100) : ''
+    setForm((prev) => {
+      if (prev.purchasePrice === nextPurchase && prev.sellingPrice === nextSelling) return prev
+      return { ...prev, purchasePrice: nextPurchase, sellingPrice: nextSelling }
+    })
+  }, [open, isBundle, form.bundleItems, catalogItems])
+
+  // Re-seed categoryId only when create form still has none and parents load async
+  // useEffect(() => {
+  //   if (!open || isEdit) return
+  //   if (form.categoryId) return
+  //   if (!categories[0]?.id) return
+  //   console.debug('[ItemFormDialog] seeding categoryId after catalog load', categories[0].id)
+  //   setForm((prev) => ({ ...prev, categoryId: categories[0].id }))
+  // }, [open, isEdit, categories, form.categoryId])
 
   function patch(field, value) {
     setForm((prev) => {
@@ -134,33 +153,31 @@ export function ItemFormDialog({
 
   function validate() {
     if (!form.name.trim()) return 'Name is required'
+    if (!form.scale) return 'Scale is required'
+
+    if (isBundle) {
+      if (!form.bundleItems || form.bundleItems.length === 0) {
+        return 'Select at least one item for this bundle'
+      }
+      for (const row of form.bundleItems) {
+        if (!row.itemId) return 'Select an item for each bundle line'
+        if (!row.quantity || Number(row.quantity) <= 0) {
+          return 'Quantity must be greater than 0 for each selected item'
+        }
+      }
+      return null
+    }
+
     if (!form.categoryId) {
       return categories.length
         ? 'Category is required'
         : 'Create a category first (Categories page), then add products'
     }
-    if (!form.scale) return 'Scale is required'
     if (form.purchasePrice === '' || Number(form.purchasePrice) < 0) {
       return 'Purchase price is required'
     }
     if (form.sellingPrice === '' || Number(form.sellingPrice) < 0) {
       return 'Selling price is required'
-    }
-    if (type === PRODUCT_TYPES.BUNDLE) {
-      if (!form.bundleItems || form.bundleItems.length === 0) {
-        return 'Add at least one bundle item'
-      }
-      const itemIds = []
-      for (const row of form.bundleItems) {
-        if (!row.itemId) return 'Select an item for each bundle line'
-        if (!row.quantity || Number(row.quantity) <= 0) {
-          return 'Quantity must be greater than 0 for each bundle line'
-        }
-        itemIds.push(row.itemId)
-      }
-      if (new Set(itemIds).size !== itemIds.length) {
-        return 'Each item can only appear once in a bundle'
-      }
     }
     return null
   }
@@ -184,23 +201,30 @@ export function ItemFormDialog({
     }
     setError(null)
     const payload = {
-      ...form,
+      name: form.name,
       type,
-      purchasePrice: Number(form.purchasePrice),
-      sellingPrice: Number(form.sellingPrice),
+      scale: form.scale,
+      description: form.description,
+      taxIds: form.taxIds,
+      offerId: form.offerId || undefined,
       discountPercent:
         form.discountPercent === '' ? undefined : Number(form.discountPercent),
-      offerId: form.offerId || undefined,
-      subcategoryId:
-        form.subcategoryId === '' || form.subcategoryId == null ? null : form.subcategoryId,
-      taxIds: form.taxIds,
+      image: form.image,
+      purchasePrice: Number(form.purchasePrice) || 0,
+      sellingPrice: Number(form.sellingPrice) || 0,
       bundleItems:
-        type === PRODUCT_TYPES.BUNDLE
+        isBundle
           ? form.bundleItems.map((row) => ({
               itemId: row.itemId,
               quantity: Number(row.quantity),
             }))
           : undefined,
+    }
+
+    if (!isBundle) {
+      payload.categoryId = form.categoryId
+      payload.subcategoryId =
+        form.subcategoryId === '' || form.subcategoryId == null ? null : form.subcategoryId
     }
     console.debug('[ItemFormDialog] submit payload keys', {
       categoryId: payload.categoryId,
@@ -235,6 +259,17 @@ export function ItemFormDialog({
   const dirty =
     step === 'success' ? false : isDirty(form) || step === 'confirm' || Boolean(confirmed)
 
+  const bundleReviewLines = useMemo(() => {
+    if (!isBundle) return []
+    return form.bundleItems
+      .map((row) => {
+        const item = catalogItems.find((entry) => entry.id === row.itemId)
+        if (!item) return null
+        return `${item.name} × ${row.quantity}`
+      })
+      .filter(Boolean)
+  }, [isBundle, form.bundleItems, catalogItems])
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange} dirty={dirty}>
       <DialogContent className="max-w-2xl">
@@ -255,216 +290,339 @@ export function ItemFormDialog({
 
         {step === 'form' ? (
           <form className="space-y-4" onSubmit={goReview}>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {!isEdit ? (
+            {isBundle ? (
+              <>
+                <div className="space-y-4">
+                  {!isEdit ? (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="product-item-code">Item code</Label>
+                      <Input
+                        id="product-item-code"
+                        value=""
+                        disabled
+                        placeholder="Generated after save"
+                        className="bg-slate-50 font-mono text-slate-500"
+                      />
+                      <p className="text-[11px] text-slate-400">
+                        System-owned — assigned automatically when you create the bundle.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="product-item-code-edit">Item code</Label>
+                      <Input
+                        id="product-item-code-edit"
+                        value={initialProduct?.itemCode || '—'}
+                        disabled
+                        className="bg-slate-50 font-mono"
+                      />
+                    </div>
+                  )}
+
+                  <BundleItemPicker
+                    catalogItems={catalogItems}
+                    value={form.bundleItems}
+                    excludeId={initialProduct?.id}
+                    loading={catalogItemsLoading}
+                    onChange={(bundleItems) => patch('bundleItems', bundleItems)}
+                  />
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="product-name">Name</Label>
+                    <Input
+                      id="product-name"
+                      value={form.name}
+                      onChange={(event) => patch('name', event.target.value)}
+                      placeholder="Bundle name"
+                    />
+                  </div>
+
+                  <ImageUploadField
+                    id="product-image"
+                    label="Image"
+                    optionalLabel="(optional)"
+                    value={form.image}
+                    existingImageUrl={isEdit ? initialProduct?.imageUrl : null}
+                    onChange={(file) => patch('image', file)}
+                  />
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="product-scale">Scale</Label>
+                      <NativeSelect
+                        id="product-scale"
+                        value={form.scale}
+                        onChange={(event) => patch('scale', event.target.value)}
+                      >
+                        <option value="">Select Scale</option>
+                        {SCALE_OPTIONS.map((scale) => (
+                          <option key={scale} value={scale}>
+                            {scale}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="product-barcode-hint">Barcode</Label>
+                      <Input
+                        id="product-barcode-hint"
+                        value={isEdit ? initialProduct?.barcode || '—' : ''}
+                        disabled
+                        placeholder="System auto-generated on create"
+                        className="bg-slate-50 font-mono text-slate-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Taxes (multiple)</Label>
+                    <TaxMultiSelect
+                      taxes={taxes}
+                      value={form.taxIds}
+                      onChange={(taxIds) => patch('taxIds', taxIds)}
+                    />
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="product-offer">Offer</Label>
+                      <NativeSelect
+                        id="product-offer"
+                        value={form.offerId}
+                        onChange={(event) => patch('offerId', event.target.value)}
+                      >
+                        <option value="">Select Offer</option>
+                        {offers.map((offer) => (
+                          <option key={offer.id} value={offer.id}>
+                            {offer.name}
+                            {offer.percent != null ? ` (${offer.percent}%)` : ''}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                      {!offers.length ? (
+                        <p className="text-[11px] text-slate-400">No offers configured yet.</p>
+                      ) : null}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="product-discount">Discount %</Label>
+                      <Input
+                        id="product-discount"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value={form.discountPercent}
+                        onChange={(event) => patch('discountPercent', event.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="product-description">Description (optional)</Label>
+                    <Textarea
+                      id="product-description"
+                      value={form.description}
+                      onChange={(event) => patch('description', event.target.value)}
+                      placeholder="Explain this bundle"
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {!isEdit ? (
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label htmlFor="product-item-code">Item code</Label>
+                    <Input
+                      id="product-item-code"
+                      value=""
+                      disabled
+                      placeholder="Generated after save"
+                      className="bg-slate-50 font-mono text-slate-500"
+                    />
+                    <p className="text-[11px] text-slate-400">
+                      System-owned — assigned automatically when you create the product.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label htmlFor="product-item-code-edit">Item code</Label>
+                    <Input
+                      id="product-item-code-edit"
+                      value={initialProduct?.itemCode || '—'}
+                      disabled
+                      className="bg-slate-50 font-mono"
+                    />
+                  </div>
+                )}
+
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label htmlFor="product-item-code">Item code</Label>
+                  <Label htmlFor="product-name">Name</Label>
                   <Input
-                    id="product-item-code"
-                    value=""
+                    id="product-name"
+                    value={form.name}
+                    onChange={(event) => patch('name', event.target.value)}
+                    placeholder="Product name"
+                  />
+                </div>
+
+                <ImageUploadField
+                  id="product-image"
+                  label="Image"
+                  optionalLabel="(optional)"
+                  value={form.image}
+                  existingImageUrl={isEdit ? initialProduct?.imageUrl : null}
+                  onChange={(file) => patch('image', file)}
+                  className="sm:col-span-2"
+                />
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="product-scale">Scale</Label>
+                  <NativeSelect
+                    id="product-scale"
+                    value={form.scale}
+                    onChange={(event) => patch('scale', event.target.value)}
+                  >
+                    <option value="">Select Scale</option>
+                    {SCALE_OPTIONS.map((scale) => (
+                      <option key={scale} value={scale}>
+                        {scale}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="product-barcode-hint">Barcode</Label>
+                  <Input
+                    id="product-barcode-hint"
+                    value={isEdit ? initialProduct?.barcode || '—' : ''}
                     disabled
-                    placeholder="Generated after save"
+                    placeholder="System auto-generated on create"
                     className="bg-slate-50 font-mono text-slate-500"
                   />
-                  <p className="text-[11px] text-slate-400">
-                    System-owned — assigned automatically when you create the product.
-                  </p>
                 </div>
-              ) : (
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label htmlFor="product-item-code-edit">Item code</Label>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="product-category">Category</Label>
+                  <NativeSelect
+                    id="product-category"
+                    value={form.categoryId}
+                    onChange={(event) => patch('categoryId', event.target.value)}
+                  >
+                    <option value="">Select category</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                  {!categories.length ? (
+                    <p className="text-[11px] text-amber-700">
+                      No categories yet — add one on the Categories page first.
+                    </p>
+                  ) : null}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="product-subcategory">Sub category</Label>
+                  <NativeSelect
+                    id="product-subcategory"
+                    value={form.subcategoryId}
+                    onChange={(event) => patch('subcategoryId', event.target.value)}
+                    disabled={!subcategories.length}
+                  >
+                    <option value="">Select Sub Category</option>
+                    {subcategories.map((sub) => (
+                      <option key={sub.id} value={sub.id}>
+                        {sub.name}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="product-purchase">Purchase price</Label>
                   <Input
-                    id="product-item-code-edit"
-                    value={initialProduct?.itemCode || '—'}
-                    disabled
-                    className="bg-slate-50 font-mono"
+                    id="product-purchase"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.purchasePrice}
+                    onChange={(event) => patch('purchasePrice', event.target.value)}
                   />
                 </div>
-              )}
 
-              <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="product-name">Name</Label>
-                <Input
-                  id="product-name"
-                  value={form.name}
-                  onChange={(event) => patch('name', event.target.value)}
-                  placeholder="Product name"
-                />
+                <div className="space-y-1.5">
+                  <Label htmlFor="product-selling">Selling price</Label>
+                  <Input
+                    id="product-selling"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.sellingPrice}
+                    onChange={(event) => patch('sellingPrice', event.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="product-discount">Discount %</Label>
+                  <Input
+                    id="product-discount"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={form.discountPercent}
+                    onChange={(event) => patch('discountPercent', event.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="product-offer">Offer</Label>
+                  <NativeSelect
+                    id="product-offer"
+                    value={form.offerId}
+                    onChange={(event) => patch('offerId', event.target.value)}
+                  >
+                    <option value="">Select Offer</option>
+                    {offers.map((offer) => (
+                      <option key={offer.id} value={offer.id}>
+                        {offer.name}
+                        {offer.percent != null ? ` (${offer.percent}%)` : ''}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                  {!offers.length ? (
+                    <p className="text-[11px] text-slate-400">No offers configured yet.</p>
+                  ) : null}
+                </div>
               </div>
+            )}
 
-              <div className="space-y-1.5">
-                <Label htmlFor="product-category">Category</Label>
-                <NativeSelect
-                  id="product-category"
-                  value={form.categoryId}
-                  onChange={(event) => patch('categoryId', event.target.value)}
-                >
-                  <option value="">Select category</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </NativeSelect>
-                {!categories.length ? (
-                  <p className="text-[11px] text-amber-700">
-                    No categories yet — add one on the Categories page first.
-                  </p>
-                ) : null}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="product-subcategory">Sub category</Label>
-                <NativeSelect
-                  id="product-subcategory"
-                  value={form.subcategoryId}
-                  onChange={(event) => patch('subcategoryId', event.target.value)}
-                  disabled={!subcategories.length}
-                >
-                  <option value="">None</option>
-                  {subcategories.map((sub) => (
-                    <option key={sub.id} value={sub.id}>
-                      {sub.name}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </div>
+            {!isBundle ? (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Taxes (multiple)</Label>
+                  <TaxMultiSelect
+                    taxes={taxes}
+                    value={form.taxIds}
+                    onChange={(taxIds) => patch('taxIds', taxIds)}
+                  />
+                </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="product-scale">Scale</Label>
-                <NativeSelect
-                  id="product-scale"
-                  value={form.scale}
-                  onChange={(event) => patch('scale', event.target.value)}
-                >
-                  {SCALE_OPTIONS.map((scale) => (
-                    <option key={scale} value={scale}>
-                      {scale}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="product-image">Image</Label>
-                <Input
-                  id="product-image"
-                  type="file"
-                  accept={IMAGE_ACCEPT}
-                  onChange={(event) => {
-                    const file = event.target.files?.[0] || null
-                    const validationError = validateImageFile(file)
-                    setImageError(validationError)
-                    if (validationError) {
-                      toastError(validationError)
-                      event.target.value = ''
-                      patch('image', null)
-                      return
-                    }
-                    patch('image', file)
-                  }}
-                />
-                <p className="text-[11px] text-slate-400">{imageUploadHint()}</p>
-                {imageError ? (
-                  <p className="text-xs text-red-600">{imageError}</p>
-                ) : null}
-              </div>
-
-              <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="product-barcode-hint">Barcode</Label>
-                <Input
-                  id="product-barcode-hint"
-                  value={isEdit ? initialProduct?.barcode || '—' : ''}
-                  disabled
-                  placeholder="System auto-generated on create"
-                  className="bg-slate-50 font-mono text-slate-500"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="product-purchase">Purchase price</Label>
-                <Input
-                  id="product-purchase"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.purchasePrice}
-                  onChange={(event) => patch('purchasePrice', event.target.value)}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="product-selling">Selling price</Label>
-                <Input
-                  id="product-selling"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.sellingPrice}
-                  onChange={(event) => patch('sellingPrice', event.target.value)}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="product-discount">Discount %</Label>
-                <Input
-                  id="product-discount"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  value={form.discountPercent}
-                  onChange={(event) => patch('discountPercent', event.target.value)}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="product-offer">Offer</Label>
-                <NativeSelect
-                  id="product-offer"
-                  value={form.offerId}
-                  onChange={(event) => patch('offerId', event.target.value)}
-                >
-                  <option value="">None</option>
-                  {offers.map((offer) => (
-                    <option key={offer.id} value={offer.id}>
-                      {offer.name}
-                      {offer.percent != null ? ` (${offer.percent}%)` : ''}
-                    </option>
-                  ))}
-                </NativeSelect>
-                {!offers.length ? (
-                  <p className="text-[11px] text-slate-400">No offers configured yet.</p>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Taxes (multiple)</Label>
-              <TaxMultiSelect
-                taxes={taxes}
-                value={form.taxIds}
-                onChange={(taxIds) => patch('taxIds', taxIds)}
-              />
-            </div>
-
-            {type === PRODUCT_TYPES.BUNDLE ? (
-              <BundleItemPicker
-                catalogItems={catalogItems}
-                value={form.bundleItems}
-                excludeId={initialProduct?.id}
-                onChange={(bundleItems) => patch('bundleItems', bundleItems)}
-              />
+                <div className="space-y-1.5">
+                  <Label htmlFor="product-description">Description (optional)</Label>
+                  <Textarea
+                    id="product-description"
+                    value={form.description}
+                    onChange={(event) => patch('description', event.target.value)}
+                    placeholder="Explain this product / item"
+                  />
+                </div>
+              </>
             ) : null}
-
-            <div className="space-y-1.5">
-              <Label htmlFor="product-description">Description (optional)</Label>
-              <Textarea
-                id="product-description"
-                value={form.description}
-                onChange={(event) => patch('description', event.target.value)}
-                placeholder="Explain this product / item"
-              />
-            </div>
 
             <DialogFooter>
               <DialogCancelButton className="cursor-pointer" />
@@ -486,13 +644,15 @@ export function ItemFormDialog({
                 <span className="text-slate-500">Name:</span>{' '}
                 <span className="font-semibold">{form.name}</span>
               </p>
-              <p className="mt-1 capitalize">
-                <span className="text-slate-500">Type:</span> {type}
-              </p>
+              {!isBundle ? (
+                <p className="mt-1 capitalize">
+                  <span className="text-slate-500">Type:</span> {type}
+                </p>
+              ) : null}
               <p className="mt-1">
                 <span className="text-slate-500">Scale:</span> {form.scale}
               </p>
-              {form.categoryId ? (
+              {!isBundle && form.categoryId ? (
                 <p className="mt-1">
                   <span className="text-slate-500">Category:</span>{' '}
                   {categories.find((cat) => cat.id === form.categoryId)?.name || '—'}
@@ -501,14 +661,48 @@ export function ItemFormDialog({
                     : ''}
                 </p>
               ) : null}
-              <p className="mt-1">
-                <span className="text-slate-500">Purchase / Selling:</span>{' '}
-                {form.purchasePrice} / {form.sellingPrice}
-              </p>
-              {type === PRODUCT_TYPES.BUNDLE ? (
+              {!isBundle ? (
                 <p className="mt-1">
-                  <span className="text-slate-500">Bundle lines:</span>{' '}
-                  {form.bundleItems.length}
+                  <span className="text-slate-500">Purchase / Selling:</span>{' '}
+                  {form.purchasePrice} / {form.sellingPrice}
+                </p>
+              ) : null}
+              {isBundle ? (
+                <div className="mt-2">
+                  <p className="text-slate-500">Bundle items:</p>
+                  {bundleReviewLines.length ? (
+                    <ul className="mt-1 list-inside list-disc text-slate-800">
+                      {bundleReviewLines.map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-1 font-semibold">{form.bundleItems.length} line(s)</p>
+                  )}
+                </div>
+              ) : null}
+              {form.taxIds?.length ? (
+                <p className="mt-1">
+                  <span className="text-slate-500">Taxes:</span>{' '}
+                  {form.taxIds
+                    .map((id) => taxes.find((tax) => tax.id === id)?.name || id)
+                    .join(', ')}
+                </p>
+              ) : null}
+              {form.offerId ? (
+                <p className="mt-1">
+                  <span className="text-slate-500">Offer:</span>{' '}
+                  {offers.find((offer) => offer.id === form.offerId)?.name || '—'}
+                </p>
+              ) : null}
+              {form.discountPercent !== '' && form.discountPercent != null ? (
+                <p className="mt-1">
+                  <span className="text-slate-500">Discount:</span> {form.discountPercent}%
+                </p>
+              ) : null}
+              {form.description ? (
+                <p className="mt-1">
+                  <span className="text-slate-500">Description:</span> {form.description}
                 </p>
               ) : null}
               <p className="mt-2 text-xs text-slate-400">

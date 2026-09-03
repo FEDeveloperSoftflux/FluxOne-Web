@@ -2,6 +2,7 @@ import { tenantClientQuery, tenantQuery, withTransaction } from '../../config/db
 import { MOVEMENT_TYPES, ROLES } from '../../config/constants.js'
 import { insertLedgerEventInTx } from '../inventory-manager/control/control.model.js'
 import { validateRefundPayload, validateSalePayload } from './sync.validator.js'
+import { normalizeImageUrl } from '../../utils/uploadUrl.util.js'
 
 function httpError(status, message) {
   const error = new Error(message)
@@ -383,7 +384,10 @@ async function fetchBootstrapCategories(tenantId, branchId, since = null) {
     `,
     [branchId, since],
   )
-  return rows
+  return rows.map((row) => ({
+    ...row,
+    imageUrl: normalizeImageUrl(row.imageUrl),
+  }))
 }
 
 async function fetchBootstrapProducts(tenantId, branchId, since = null) {
@@ -415,7 +419,10 @@ async function fetchBootstrapProducts(tenantId, branchId, since = null) {
     `,
     [branchId, since],
   )
-  return rows
+  return rows.map((row) => ({
+    ...row,
+    imageUrl: normalizeImageUrl(row.imageUrl),
+  }))
 }
 
 async function fetchProductTaxMap(tenantId, productIds) {

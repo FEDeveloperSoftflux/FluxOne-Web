@@ -16,10 +16,7 @@ import {
 import { ROLE_IDS, ROLES } from '../../../config/constants.js'
 import { fail, success } from '../../../utils/response.util.js'
 import { paginatedResult } from '../../../utils/pagination.util.js'
-
-function uploadedUrl(file) {
-  return file?.path || file?.secure_url || null
-}
+import { resolveUploadUrl } from '../../../utils/uploadUrl.util.js'
 
 function bmBranchFilter(req) {
   if (req.user?.role === ROLES.BRANCH_MANAGER) {
@@ -51,7 +48,7 @@ export async function createStaff(req, res) {
     passwordHash,
     createdBy: req.user.id,
     branchId,
-    imageUrl: uploadedUrl(req.file),
+    imageUrl: resolveUploadUrl(req.file, req),
   })
   return success(res, created, 201)
 }
@@ -70,7 +67,7 @@ export async function patchStaff(req, res) {
     body.passwordHash = await bcrypt.hash(body.password, 10)
     delete body.password
   }
-  const imageUrl = uploadedUrl(req.file)
+  const imageUrl = resolveUploadUrl(req.file, req)
   if (imageUrl) body.imageUrl = imageUrl
 
   const row = await updateStaff(req.tenantId, req.validated.params.id, body, {

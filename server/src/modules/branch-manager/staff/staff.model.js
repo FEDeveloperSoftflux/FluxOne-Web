@@ -1,6 +1,7 @@
 import { tenantClientQuery, tenantQuery, withTransaction } from '../../../config/db.js'
 import { ROLE_IDS, ROLES } from '../../../config/constants.js'
 import { STAFF_ROLE_TO_DESIGNATION } from './staff.access.js'
+import { normalizeImageUrl } from '../../../utils/uploadUrl.util.js'
 
 function httpError(status, message) {
   const error = new Error(message)
@@ -29,6 +30,14 @@ const staffSelect = `
   u.is_active AS "isActive",
   r.slug AS role
 `
+
+function mapStaffRow(row) {
+  if (!row) return null
+  return {
+    ...row,
+    imageUrl: normalizeImageUrl(row.imageUrl),
+  }
+}
 
 function mapPgUniqueViolation(err, message) {
   if (err?.code === '23505') {
@@ -99,7 +108,7 @@ export async function listStaff(tenantId, filters = {}) {
     [...params, limit, offset],
   )
 
-  return { items: rows, total: countRows[0]?.total || 0, page, limit }
+  return { items: rows.map(mapStaffRow), total: countRows[0]?.total || 0, page, limit }
 }
 
 export async function getStaffById(tenantId, id, { branchId } = {}) {
@@ -119,7 +128,7 @@ export async function getStaffById(tenantId, id, { branchId } = {}) {
     `,
     [id, branchId || null],
   )
-  return rows[0] || null
+  return mapStaffRow(rows[0] || null)
 }
 
 async function lookupDesignation(client, tenantId, { designationId, designationName }) {
@@ -312,7 +321,7 @@ async function getStaffByIdInTx(client, tenantId, id, { branchId } = {}) {
     `,
     [id, branchId || null],
   )
-  return rows[0] || null
+  return mapStaffRow(rows[0] || null)
 }
 
 export async function updateStaff(tenantId, id, payload, { branchId } = {}) {

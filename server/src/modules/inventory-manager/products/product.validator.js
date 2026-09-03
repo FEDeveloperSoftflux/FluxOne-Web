@@ -53,13 +53,13 @@ export const createProductSchema = z
   .object({
     body: z.object({
       name: z.string().min(1),
-      categoryId: looseUuid,
+      categoryId: optionalLooseUuid,
       subcategoryId: optionalLooseUuid,
       type: z.enum([PRODUCT_TYPES.SINGLE, PRODUCT_TYPES.BUNDLE]).default(PRODUCT_TYPES.SINGLE),
       scale: z.string().min(1),
       description: z.string().optional(),
-      purchasePrice: z.coerce.number().nonnegative(),
-      sellingPrice: z.coerce.number().nonnegative(),
+      purchasePrice: z.coerce.number().nonnegative().optional(),
+      sellingPrice: z.coerce.number().nonnegative().optional(),
       taxIds: z.array(looseUuid).optional(),
       offerId: optionalLooseUuid,
       discountPercent: z.coerce.number().min(0).max(100).optional(),
@@ -81,6 +81,13 @@ export const createProductSchema = z
     {
       message: 'Bundle products require at least one bundle item',
       path: ['body', 'bundleItems'],
+    },
+  )
+  .refine(
+    ({ body }) => body.type === PRODUCT_TYPES.BUNDLE || Boolean(body.categoryId),
+    {
+      message: 'categoryId is required for single items',
+      path: ['body', 'categoryId'],
     },
   )
 

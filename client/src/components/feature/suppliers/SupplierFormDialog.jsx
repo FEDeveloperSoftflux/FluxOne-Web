@@ -12,11 +12,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/select'
+import { ImageUploadField } from '@/components/shared/ImageUploadField'
 import { BRAND } from '@/lib/constants'
 import { validateSupplierForm } from '@/lib/validation/supplierForm'
 import { useFormBaseline } from '@/hooks/useFormBaseline'
-import { IMAGE_ACCEPT, imageUploadHint, validateImageFile } from '@/lib/imageUpload'
-import { toastError } from '@/lib/toast'
 
 const EMPTY = {
   companyName: '',
@@ -38,28 +37,11 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
   const isEdit = mode === 'edit'
   const [form, setForm] = useState(EMPTY)
   const [error, setError] = useState(null)
-  const [imageError, setImageError] = useState(null)
-  const [signatureError, setSignatureError] = useState(null)
   const { captureBaseline, isDirty } = useFormBaseline(open)
-
-  function handleImageField(field, file, event) {
-    const validationError = validateImageFile(file)
-    if (field === 'image') setImageError(validationError)
-    else setSignatureError(validationError)
-    if (validationError) {
-      toastError(validationError)
-      event.target.value = ''
-      patch(field, null)
-      return
-    }
-    patch(field, file)
-  }
 
   useEffect(() => {
     if (!open) return
     setError(null)
-    setImageError(null)
-    setSignatureError(null)
     if (isEdit && initialSupplier) {
       const nextForm = {
         companyName: initialSupplier.companyName || '',
@@ -126,17 +108,14 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="sup-image">Image (optional)</Label>
-              <Input
-                id="sup-image"
-                type="file"
-                accept={IMAGE_ACCEPT}
-                onChange={(e) => handleImageField('image', e.target.files?.[0] || null, e)}
-              />
-              <p className="text-[11px] text-slate-400">{imageUploadHint()}</p>
-              {imageError ? <p className="text-xs text-red-600">{imageError}</p> : null}
-            </div>
+            <ImageUploadField
+              id="sup-image"
+              label="Image"
+              optionalLabel="(optional)"
+              value={form.image}
+              existingImageUrl={isEdit ? initialSupplier?.imageUrl : null}
+              onChange={(file) => patch('image', file)}
+            />
 
             <div className="space-y-1.5">
               <Label htmlFor="sup-phone">Company contact number</Label>
@@ -215,16 +194,15 @@ export function SupplierFormDialog({ open, onOpenChange, mode = 'create', initia
               />
             </div>
 
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="sup-signature">Digital signature (optional)</Label>
-              <Input
-                id="sup-signature"
-                type="file"
-                accept={IMAGE_ACCEPT}
-                onChange={(e) => handleImageField('signature', e.target.files?.[0] || null, e)}
-              />
-              {signatureError ? <p className="text-xs text-red-600">{signatureError}</p> : null}
-            </div>
+            <ImageUploadField
+              id="sup-signature"
+              label="Digital signature"
+              optionalLabel="(optional)"
+              className="sm:col-span-2"
+              value={form.signature}
+              existingImageUrl={isEdit ? initialSupplier?.signatureUrl : null}
+              onChange={(file) => patch('signature', file)}
+            />
           </div>
 
           <DialogFooter>

@@ -53,6 +53,17 @@ export const updateProfile = createAsyncThunk(
   },
 )
 
+export const fetchCurrentUser = createAsyncThunk(
+  'auth/fetchCurrentUser',
+  async (_, { rejectWithValue }) => {
+    const result = await apiClient.get(endpoints.auth.me)
+    if (!result?.success) {
+      return rejectWithValue(result?.error || 'Failed to load profile')
+    }
+    return result.data
+  },
+)
+
 const authSlice = createSlice({
   name: 'auth',
   initialState: {
@@ -120,6 +131,12 @@ const authSlice = createSlice({
         clearSessionState(state)
       })
       .addCase(updateProfile.fulfilled, (state, action) => {
+        state.user = action.payload
+        state.role = action.payload?.role || state.role
+        tokenStorage.setUser(action.payload)
+      })
+      .addCase(fetchCurrentUser.fulfilled, (state, action) => {
+        if (!action.payload) return
         state.user = action.payload
         state.role = action.payload?.role || state.role
         tokenStorage.setUser(action.payload)

@@ -1,4 +1,5 @@
 import { tenantQuery } from '../../../config/db.js'
+import { normalizeImageUrl } from '../../../utils/uploadUrl.util.js'
 
 const supplierSelect = `
   id,
@@ -16,6 +17,15 @@ const supplierSelect = `
   is_active AS "isActive",
   branch_id AS "branchId"
 `
+
+function mapSupplierRow(row) {
+  if (!row) return null
+  return {
+    ...row,
+    imageUrl: normalizeImageUrl(row.imageUrl),
+    signatureUrl: normalizeImageUrl(row.signatureUrl),
+  }
+}
 
 function activeSqlClause(active) {
   if (active === 'all') return ''
@@ -55,7 +65,7 @@ export async function listSuppliers(tenantId, { q, page = 1, limit = 8, active =
   )
 
   const total = rows[0]?._total || 0
-  const items = rows.map(({ _total, ...item }) => item)
+  const items = rows.map(({ _total, ...item }) => mapSupplierRow(item))
   return { items, total, page: safePage, limit: safeLimit }
 }
 
@@ -92,7 +102,7 @@ export async function createSupplier(tenantId, payload) {
       payload.signatureUrl || null,
     ],
   )
-  return rows[0]
+  return mapSupplierRow(rows[0])
 }
 
 export async function updateSupplier(tenantId, id, payload, { branchId = null } = {}) {
@@ -133,7 +143,7 @@ export async function updateSupplier(tenantId, id, payload, { branchId = null } 
       `,
       [id, branchId],
     )
-    return rows[0] || null
+    return mapSupplierRow(rows[0] || null)
   }
 
   const { rows } = await tenantQuery(
@@ -147,7 +157,7 @@ export async function updateSupplier(tenantId, id, payload, { branchId = null } 
     `,
     params,
   )
-  return rows[0] || null
+  return mapSupplierRow(rows[0] || null)
 }
 
 export async function setSupplierActive(tenantId, id, isActive, { branchId = null } = {}) {
@@ -162,7 +172,7 @@ export async function setSupplierActive(tenantId, id, isActive, { branchId = nul
     `,
     [isActive, id, branchId],
   )
-  return rows[0] || null
+  return mapSupplierRow(rows[0] || null)
 }
 
 /** Soft-deactivate supplier (replaces hard delete for client UX). */

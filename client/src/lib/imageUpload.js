@@ -26,3 +26,15 @@ export function validateImageFile(file) {
 export function imageUploadHint() {
   return `Max ${IMAGE_MAX_LABEL}. ${IMAGE_FORMATS_LABEL}.`
 }
+
+/** Extract a display filename from a stored image URL (e.g. Asad.jpeg). */
+export function imageFileNameFromUrl(url) {
+  if (!url || typeof url !== 'string') return ''
+  try {
+    const withoutQuery = url.split('?')[0]
+    const segment = withoutQuery.split('/').filter(Boolean).pop() || ''
+    return decodeURIComponent(segment) || 'image'
+  } catch {
+    return 'image'
+  }
+}

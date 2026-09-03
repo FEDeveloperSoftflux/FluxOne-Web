@@ -1,6 +1,6 @@
 import { Pencil } from 'lucide-react'
-import { BRAND } from '@/lib/constants'
-import { getInitials, roleDisplayName } from '@/lib/nav'
+import { UserAvatar } from '@/components/shared/UserAvatar'
+import { roleDisplayName } from '@/lib/nav'
 import { cn } from '@/lib/utils'
 
 function DetailRow({ label, value }) {
@@ -25,10 +25,10 @@ export function ProfileCard({
   loginExpires,
   onEdit,
   className,
+  imageUrl = null,
 }) {
   const displayName = name || 'User'
   const roleLabel = roleDisplayName(role)
-  const initials = getInitials(displayName, loginId)
 
   return (
     <section
@@ -49,12 +49,13 @@ export function ProfileCard({
       ) : null}
 
       <div className="flex items-center gap-3 pr-10 sm:gap-4">
-        <div
-          className="flex size-14 shrink-0 items-center justify-center rounded-full text-base font-bold text-white sm:size-[4.5rem] sm:text-xl"
-          style={{ background: BRAND.purple }}
-        >
-          {initials}
-        </div>
+        <UserAvatar
+          name={displayName}
+          loginId={loginId}
+          imageUrl={imageUrl}
+          className="size-14 sm:size-[4.5rem]"
+          fallbackClassName="text-base sm:text-xl"
+        />
         <div className="min-w-0">
           <h2 className="truncate text-lg font-bold tracking-tight text-slate-900 sm:text-2xl">
             {displayName}

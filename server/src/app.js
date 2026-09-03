@@ -3,6 +3,8 @@ import cors from 'cors'
 import helmet from 'helmet'
 import compression from 'compression'
 import morgan from 'morgan'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import { pool } from './config/db.js'
 import { authMiddleware } from './middlewares/auth.middleware.js'
 import { errorMiddleware, notFoundMiddleware } from './middlewares/error.middleware.js'
@@ -19,6 +21,9 @@ import branchRoutes from './modules/branch-manager/branch.routes.js'
 import syncRoutes from './modules/sync/sync.routes.js'
 
 export const app = express()
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const localUploadsDir = path.resolve(__dirname, '../uploads')
 
 const origin = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
 const isProd = process.env.NODE_ENV === 'production'
@@ -47,6 +52,7 @@ app.use(compression())
 app.use(express.json({ limit: '2mb' }))
 app.use(express.urlencoded({ extended: true }))
 app.use(morgan(isProd ? 'combined' : 'dev'))
+app.use('/uploads', express.static(localUploadsDir))
 app.use(globalLimiter)
 
 app.get('/api/health', async (_req, res) => {

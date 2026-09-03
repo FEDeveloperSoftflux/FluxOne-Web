@@ -21,6 +21,7 @@ function publicUser(user) {
     tenantName: user.tenantName || null,
     branchId: user.branchId,
     branchName: user.branchName || null,
+    imageUrl: user.imageUrl || null,
   }
 }
 

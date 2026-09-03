@@ -1,5 +1,6 @@
 import { tenantClientQuery, tenantQuery, withTransaction } from '../../../config/db.js'
 import { PRODUCT_TYPES } from '../../../config/constants.js'
+import { normalizeImageUrl } from '../../../utils/uploadUrl.util.js'
 
 function httpError(status, message) {
   const error = new Error(message)
@@ -34,7 +35,18 @@ export async function listCategories(tenantId, { active = 'active', branchId = n
     `,
     [branchId],
   )
-  return rows
+  return rows.map((row) => ({
+    ...row,
+    imageUrl: normalizeImageUrl(row.imageUrl),
+  }))
+}
+
+function mapCategoryRow(row) {
+  if (!row) return null
+  return {
+    ...row,
+    imageUrl: normalizeImageUrl(row.imageUrl),
+  }
 }
 
 export async function createCategory(tenantId, { name, parentId, imageUrl, branchId }) {
@@ -66,7 +78,7 @@ export async function createCategory(tenantId, { name, parentId, imageUrl, branc
     `,
     [branchId, parentId || null, name, imageUrl || null],
   )
-  return rows[0]
+  return mapCategoryRow(rows[0])
 }
 
 export async function updateCategory(tenantId, id, { name, imageUrl, isActive, branchId = null }) {
@@ -99,7 +111,7 @@ export async function updateCategory(tenantId, id, { name, imageUrl, isActive, b
       `,
       [id, branchId],
     )
-    return rows[0] || null
+    return mapCategoryRow(rows[0] || null)
   }
 
   const { rows } = await tenantQuery(
@@ -114,7 +126,7 @@ export async function updateCategory(tenantId, id, { name, imageUrl, isActive, b
     `,
     params,
   )
-  return rows[0] || null
+  return mapCategoryRow(rows[0] || null)
 }
 
 /**
@@ -340,7 +352,10 @@ export async function listProducts(tenantId, filters = {}) {
   )
 
   const total = rows[0]?._total || 0
-  const items = rows.map(({ _total, ...item }) => item)
+  const items = rows.map(({ _total, ...item }) => ({
+    ...item,
+    imageUrl: normalizeImageUrl(item.imageUrl),
+  }))
   return { items, total, page, limit }
 }
 
@@ -453,7 +468,11 @@ export async function getProductDetail(tenantId, id, { branchId = null } = {}) {
     [id],
   )
 
-  return { ...product, bundleItems: bundleRows }
+  return {
+    ...product,
+    imageUrl: normalizeImageUrl(product.imageUrl),
+    bundleItems: bundleRows,
+  }
 }
 
 async function attachTaxes(client, tenantId, productId, taxIds = []) {
@@ -564,6 +583,38 @@ async function validateProductCategories(client, tenantId, { categoryId, subcate
   }
 }
 
+async function resolveBundlePrices(client, tenantId, bundleItems = [], branchId = null) {
+  if (!bundleItems.length) return { purchasePrice: 0, sellingPrice: 0 }
+
+  const ids = bundleItems.map((item) => item.itemId)
+  const qtyById = new Map(bundleItems.map((item) => [item.itemId, Number(item.quantity) || 1]))
+
+  const { rows } = await tenantClientQuery(
+    client,
+    tenantId,
+    `
+      SELECT id, purchase_price AS "purchasePrice", selling_price AS "sellingPrice"
+      FROM products
+      WHERE tenant_id = $1 AND id = ANY($2::uuid[])
+        ${branchClause('', 3)}
+    `,
+    [ids, branchId],
+  )
+
+  let purchasePrice = 0
+  let sellingPrice = 0
+  for (const row of rows) {
+    const qty = qtyById.get(row.id) || 1
+    purchasePrice += Number(row.purchasePrice || 0) * qty
+    sellingPrice += Number(row.sellingPrice || 0) * qty
+  }
+
+  return {
+    purchasePrice: Math.round(purchasePrice * 100) / 100,
+    sellingPrice: Math.round(sellingPrice * 100) / 100,
+  }
+}
+
 export async function createProduct(tenantId, payload) {
   if (!payload.branchId) throw httpError(422, 'branchId is required to create a product')
 
@@ -579,6 +630,19 @@ export async function createProduct(tenantId, payload) {
       }
     }
 
+    let purchasePrice = payload.purchasePrice ?? 0
+    let sellingPrice = payload.sellingPrice ?? 0
+    if (payload.type === PRODUCT_TYPES.BUNDLE && payload.bundleItems?.length) {
+      const derived = await resolveBundlePrices(
+        client,
+        tenantId,
+        payload.bundleItems,
+        payload.branchId,
+      )
+      purchasePrice = derived.purchasePrice
+      sellingPrice = derived.sellingPrice
+    }
+
     const { rows } = await tenantClientQuery(
       client,
       tenantId,
@@ -592,7 +656,7 @@ export async function createProduct(tenantId, payload) {
       `,
       [
         payload.branchId,
-        payload.categoryId,
+        payload.categoryId || null,
         payload.subcategoryId || null,
         payload.type,
         payload.itemCode,
@@ -601,8 +665,8 @@ export async function createProduct(tenantId, payload) {
         payload.scale,
         payload.barcode,
         payload.description || null,
-        payload.purchasePrice ?? 0,
-        payload.sellingPrice ?? 0,
+        purchasePrice,
+        sellingPrice,
         payload.offerId || null,
         payload.discountPercent || null,
         payload.quantity ?? 0,
@@ -769,7 +833,24 @@ export async function updateProduct(tenantId, id, payload, { branchId = null } =
 
     if (payload.taxIds !== undefined) await attachTaxes(client, tenantId, id, payload.taxIds)
     if (payload.bundleItems !== undefined) {
-      await attachBundleItems(client, tenantId, id, payload.bundleItems, product.branchId || branchId)
+      const effectiveBranchId = product.branchId || branchId
+      await attachBundleItems(client, tenantId, id, payload.bundleItems, effectiveBranchId)
+      const derived = await resolveBundlePrices(
+        client,
+        tenantId,
+        payload.bundleItems,
+        effectiveBranchId,
+      )
+      await tenantClientQuery(
+        client,
+        tenantId,
+        `
+          UPDATE products
+          SET purchase_price = $3, selling_price = $4
+          WHERE tenant_id = $1 AND id = $2
+        `,
+        [id, derived.purchasePrice, derived.sellingPrice],
+      )
     }
     return product
   })

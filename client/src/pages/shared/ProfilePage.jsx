@@ -11,16 +11,16 @@ import { useAppDispatch } from '@/rtk/hooks'
 import { updateProfile } from '@/rtk/features/auth/authSlice'
 import { toastError, toastSuccess } from '@/lib/toast'
 
-/**
- * Shared profile page for Branch Manager and Inventory Manager.
- * Matches the signed-in details card layout (no email row).
- */
+//
+// Shared profile page for Branch Manager and Inventory Manager.
+// Matches the signed-in details card layout (no email row).
+//
 export function ProfilePage() {
   const dispatch = useAppDispatch()
   const { user, role, token, isAuthenticated } = useAuthSession()
   const [editOpen, setEditOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-
+  const imageUrl = user?.imageUrl || null
   const allowed =
     BRANCH_ROLES.includes(role) ||
     INVENTORY_ROLES.includes(role) ||
@@ -74,6 +74,7 @@ export function ProfilePage() {
           role={role}
           loginExpires={loginExpires}
           onEdit={() => setEditOpen(true)}
+          imageUrl={imageUrl}
         />
       </MotionReveal>
 
