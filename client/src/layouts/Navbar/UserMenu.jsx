@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, LogOut, UserRound } from 'lucide-react'
+import { ChevronDown, LogOut, Settings, UserRound } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useAuthSession } from '@/hooks/useAuthSession'
-import { BRAND } from '@/lib/constants'
+import { BRAND, ROLES } from '@/lib/constants'
 import { getInitials, roleDisplayName } from '@/lib/nav'
 import { cn } from '@/lib/utils'
 import { PATHS, profilePathForRole } from '@/router/paths'
@@ -75,6 +75,15 @@ export function UserMenu({ className }) {
               <UserRound className="size-4" />
               Profile
             </DropdownMenuItem>
+            {role === ROLES.B2B_ADMIN && (
+              <DropdownMenuItem
+                className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-slate-700 cursor-pointer"
+                onClick={() => navigate('/admin/settings')}
+              >
+                <Settings className="size-4" />
+                Settings
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-red-600 hover:bg-red-50 cursor-pointer"
               onClick={() => {

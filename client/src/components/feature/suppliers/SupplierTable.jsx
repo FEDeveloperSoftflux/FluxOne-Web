@@ -1,8 +1,16 @@
 import { Building2, Pencil } from 'lucide-react'
 import { EmptyState } from '@/components/shared/EmptyState'
-import { Pagination } from '@/components/shared/Pagination'
 import { SurfaceCard } from '@/components/shared/SurfaceCard'
 import { Button } from '@/components/ui/button'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+  TablePagination,
+} from '@/components/ui/table'
 import { TableRowsSkeleton } from '@/components/ui/skeleton'
 import { BRAND } from '@/lib/constants'
 import { ProductStatusToggle } from '@/components/feature/products/ProductStatusToggle'
@@ -33,7 +41,7 @@ export function SupplierTable({
       description="Companies you purchase from"
       actions={
         <span className="text-xs font-medium text-slate-400">
-          {total} supplier{total === 1 ? '' : 's'} · 8 / page
+          {total} records · 8 / page
         </span>
       }
     >
@@ -47,26 +55,26 @@ export function SupplierTable({
         />
       ) : (
         <div className="overflow-x-auto -mx-1 px-1 sm:mx-0 sm:px-0">
-          <table className="w-full min-w-[720px] border-collapse text-left text-sm lg:min-w-[960px]">
-            <thead>
-              <tr className="border-b border-border text-xs uppercase tracking-wide text-slate-400">
-                <th className="px-2 py-3 font-semibold">Image</th>
-                <th className="px-2 py-3 font-semibold">ID</th>
-                <th className="px-2 py-3 font-semibold">Company</th>
-                <th className="px-2 py-3 font-semibold">Company phone</th>
-                <th className="px-2 py-3 font-semibold">Representative</th>
-                <th className="px-2 py-3 font-semibold">Location</th>
-                <th className="px-2 py-3 font-semibold">Tax paid</th>
-                <th className="px-2 py-3 font-semibold">Reg / Bank</th>
-                <th className="px-2 py-3 font-semibold">Signature</th>
-                <th className="px-2 py-3 font-semibold">Status</th>
-                <th className="px-2 py-3 font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table className="min-w-[720px] text-left text-sm lg:min-w-[960px]">
+            <TableHeader>
+              <TableRow className="text-xs uppercase tracking-wide text-slate-400">
+                <TableHead className="px-2 py-3 font-semibold">Image</TableHead>
+                <TableHead className="px-2 py-3 font-semibold">ID</TableHead>
+                <TableHead className="px-2 py-3 font-semibold">Company</TableHead>
+                <TableHead className="px-2 py-3 font-semibold">Company phone</TableHead>
+                <TableHead className="px-2 py-3 font-semibold">Representative</TableHead>
+                <TableHead className="px-2 py-3 font-semibold">Location</TableHead>
+                <TableHead className="px-2 py-3 font-semibold">Tax paid</TableHead>
+                <TableHead className="px-2 py-3 font-semibold">Reg / Bank</TableHead>
+                <TableHead className="px-2 py-3 font-semibold">Signature</TableHead>
+                <TableHead className="px-2 py-3 font-semibold">Status</TableHead>
+                <TableHead className="px-2 py-3 font-semibold">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {list.map((row) => (
-                <tr key={row.id} className="border-b border-border/70 align-top">
-                  <td className="px-2 py-3">
+                <TableRow key={row.id} className="align-top hover:bg-slate-50/80">
+                  <TableCell className="px-2 py-3">
                     {row.imageUrl ? (
                       <img
                         src={row.imageUrl}
@@ -83,13 +91,13 @@ export function SupplierTable({
                         {(row.companyName || '?').slice(0, 1).toUpperCase()}
                       </div>
                     )}
-                  </td>
-                  <td className="px-2 py-3 font-mono text-[11px] text-slate-500">
+                  </TableCell>
+                  <TableCell className="px-2 py-3 font-mono text-[11px] text-slate-500">
                     {row.id?.slice(0, 8)}…
-                  </td>
-                  <td className="px-2 py-3 font-medium text-slate-800">{row.companyName}</td>
-                  <td className="px-2 py-3 text-slate-600">{row.companyPhone || '—'}</td>
-                  <td className="px-2 py-3 text-slate-600">
+                  </TableCell>
+                  <TableCell className="px-2 py-3 font-medium text-slate-800">{row.companyName}</TableCell>
+                  <TableCell className="px-2 py-3 text-slate-600">{row.companyPhone || '—'}</TableCell>
+                  <TableCell className="px-2 py-3 text-slate-600">
                     <span className="block font-medium">{row.representativeName || '—'}</span>
                     <span className="block text-xs text-slate-400">
                       {row.representativePhone || '—'}
@@ -97,9 +105,9 @@ export function SupplierTable({
                     <span className="block text-xs text-slate-400">
                       {row.representativeEmail || '—'}
                     </span>
-                  </td>
-                  <td className="px-2 py-3 text-slate-600">{row.location || '—'}</td>
-                  <td className="px-2 py-3">
+                  </TableCell>
+                  <TableCell className="px-2 py-3 text-slate-600">{row.location || '—'}</TableCell>
+                  <TableCell className="px-2 py-3">
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                         row.taxPaid
@@ -109,12 +117,12 @@ export function SupplierTable({
                     >
                       {row.taxPaid ? 'Yes' : 'No'}
                     </span>
-                  </td>
-                  <td className="px-2 py-3 text-xs text-slate-500">
+                  </TableCell>
+                  <TableCell className="px-2 py-3 text-xs text-slate-500">
                     <span className="block">{row.registrationNumber || '—'}</span>
                     <span className="block font-mono">{row.bankAccountNumber || '—'}</span>
-                  </td>
-                  <td className="px-2 py-3">
+                  </TableCell>
+                  <TableCell className="px-2 py-3">
                     {row.signatureUrl ? (
                       <img
                         src={row.signatureUrl}
@@ -124,8 +132,8 @@ export function SupplierTable({
                     ) : (
                       <span className="text-xs text-slate-400">—</span>
                     )}
-                  </td>
-                  <td className="px-2 py-3">
+                  </TableCell>
+                  <TableCell className="px-2 py-3">
                     <ProductStatusToggle
                       status={row.isActive === false ? 'inactive' : 'active'}
                       loading={statusUpdatingId === row.id}
@@ -133,8 +141,8 @@ export function SupplierTable({
                         onStatusChange?.(row, status === 'active')
                       }
                     />
-                  </td>
-                  <td className="px-2 py-3">
+                  </TableCell>
+                  <TableCell className="px-2 py-3">
                     <div className="flex gap-1">
                       <Button
                         type="button"
@@ -146,18 +154,19 @@ export function SupplierTable({
                         <Pencil className="size-4" />
                       </Button>
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
 
       {!isEmpty ? (
-        <Pagination
+        <TablePagination
           page={page}
           pageCount={pageCount}
+          totalItems={total}
           loading={loading}
           onPageChange={onPageChange}
         />
